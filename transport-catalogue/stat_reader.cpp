@@ -39,34 +39,34 @@ statistic::Requests statistic::MakeRequests(istream& input)
 	return result;
 }
 
-void statistic::PrinStat(vector<pair<char, Info>>&& information){
+void statistic::PrinStat(ostream& out, vector<pair<char, Info>>&& information){
 	for (auto info : information) {
 		if (info.first == 'B') {
-			cout << "Bus " << info.second.name_ << ": ";
+			out << "Bus " << info.second.name_ << ": ";
 			if (!info.second.existing_) {
-				cout << "not found" << endl;
+				out << "not found" << endl;
 				continue;
 			}
-				cout << info.second.stops_on_route_ << " stops on route, " <<
+				out << info.second.stops_on_route_ << " stops on route, " <<
 				info.second.unique_stops_ << " unique stops, "<<
 				info.second.route_length_ << " route length, " <<
 					setprecision(6)<< info.second.curvature_<< " curvature" << endl;
 		}
 		else {
-			cout << "Stop " << info.second.name_ << ": ";
+			out << "Stop " << info.second.name_ << ": ";
 			if (!info.second.existing_) {
-				cout << "not found" << endl;
+				out << "not found" << endl;
 			}
 			else if (info.second.busses_to_stop_.empty()) {
-				cout << "no buses" << endl;
+				out << "no buses" << endl;
 			}
 			else
 			{
-				cout << "buses ";
+				out << "buses ";
 				for (auto bus_name : info.second.busses_to_stop_) {
-					cout << bus_name << ' ';
+					out << bus_name << ' ';
 				}
-				cout << endl;
+				out << endl;
 			}
 		}
 	}

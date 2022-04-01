@@ -42,15 +42,54 @@ void TransportCatalogue::AddBus(input::NewBus&& bus_req)
 	bus.route_is_circular_ = get<1>(bus_req);
 
 	deque<Stop*> stops;
-	for (auto& stop_name : get<2>(bus_req)) {
-		Stop* stop_ptr= FindStop(stop_name);
-		stops.push_back(stop_ptr);
-		FindStop(stop_name)->bus_names.insert(busses_.back().name_);
+	unordered_set<string_view> uniq_stops;
+
+	double straight_dist = 0;
+	int route_length = 0;
+
+	string& firststop_name = get<2>(bus_req)[0];
+	Stop* firststop_ptr = FindStop(firststop_name);
+
+	uniq_stops.insert(firststop_ptr->name);
+	stops.push_back(firststop_ptr);
+	firststop_ptr->bus_names.insert(busses_.back().name_);
+
+	Coordinates from{ firststop_ptr->latitude, firststop_ptr->longitude };
+	Stop* stop_from = firststop_ptr;
+	for (size_t n = 1; n < get<2>(bus_req).size(); ++n)
+	{
+		string& stop_name = get<2>(bus_req)[n];
+		Stop* stop_to = FindStop(stop_name);
+
+		uniq_stops.insert(stop_to->name);
+		stops.push_back(stop_to);
+		stop_to->bus_names.insert(busses_.back().name_);
+
+		Coordinates to{ stop_to->latitude, stop_to->longitude };
+		straight_dist += ComputeDistance(from, to);
+		from = to;
+
+		pair from_to = make_pair(stop_from, stop_to);
+
+		auto dist_iter = from_to_dist.find(from_to);
+		if (dist_iter == from_to_dist.end()) {
+			from_to = make_pair(stop_to, stop_from);
+			dist_iter = from_to_dist.find(from_to);
+			if (dist_iter == from_to_dist.end()) {
+				stop_to = stop_from;
+				continue;
+			}
+		}
+		route_length += (*dist_iter).second;
+		stop_from = stop_to;
 	}
-
+	
+	bus.straight_dist_ = straight_dist;
+	bus.route_length_ = route_length;
+	bus.curvature_ = route_length / straight_dist;
 	bus.stops_ = move(stops);
-
 	busname_to_bus_[bus.name_] = &busses_.back();
+	bus.unique_stops_ = move(uniq_stops);
 }
 
 Bus* TransportCatalogue::FindBus(string_view bus_name)
@@ -79,60 +118,21 @@ Stop* TransportCatalogue::FindStop(string_view stop_name)
 	}
 }
 
-size_t TransportCatalogue::GetUniqs(const Bus* bus)
-{
-	std::unordered_set<string_view> stops_uniq_;
-	for (const auto& stop : bus->stops_) {
-		stops_uniq_.insert(move(stop->name));
-	}
-	return stops_uniq_.size();
-}
-
 Info TransportCatalogue::GetBusInfo(string&& bus_name)
 {
 	Bus* bus_ptr = FindBus(bus_name);
 	Info result;
-
 	if (bus_ptr == nullptr) {
 		result.name_ = move(bus_name);
 		return result;
 	}
-
 	result.existing_ = true;
-
 	result.stops_on_route_ = bus_ptr->stops_.size();
-
-	result.unique_stops_ = GetUniqs(FindBus(bus_name));
+	result.unique_stops_ = bus_ptr->unique_stops_.size();
 	result.name_ = move(bus_name);
-	
-	double straight_dist = 0;
-	int route_length = 0;
-	Coordinates from{ bus_ptr->stops_[0]->latitude, bus_ptr->stops_[0]->longitude };
-	Stop* stop_from = bus_ptr->stops_[0];
-	for (size_t n = 1; n < bus_ptr->stops_.size(); ++n) 
-	{
-		Coordinates to{ bus_ptr->stops_[n]->latitude, bus_ptr->stops_[n]->longitude };
-		straight_dist += ComputeDistance(from, to);
-		from = to;
-
-		Stop* stop_to = bus_ptr->stops_[n];
-		pair from_to = make_pair(stop_from, stop_to);
-
-		auto dist_iter = from_to_dist.find(from_to);
-		if (dist_iter == from_to_dist.end()) {
-			from_to = make_pair(stop_to, stop_from);
-			dist_iter = from_to_dist.find(from_to);
-			if (dist_iter == from_to_dist.end()) {
-				stop_to = stop_from;
-				continue;
-			}
-		}
-		route_length += (*dist_iter).second;
-		stop_from = stop_to;
-	}
-	result.curvature_ = route_length / straight_dist;
-	result.straight_dist_ = move(straight_dist);
-	result.route_length_ = move(route_length);
+	result.straight_dist_ = bus_ptr->straight_dist_;
+	result.route_length_ = bus_ptr->route_length_;
+	result.curvature_ = bus_ptr->curvature_;
 	return result;
 }
 

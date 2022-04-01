@@ -24,6 +24,10 @@ struct Bus
 	bool route_is_circular_;
 	std::string name_;
 	std::deque<Stop*> stops_;
+	std::unordered_set<std::string_view> unique_stops_;
+	double straight_dist_;
+	int route_length_;
+	double curvature_;
 };
 
 struct Info
@@ -56,7 +60,7 @@ public:
 	Bus* FindBus(std::string_view bus_name);
 	Stop* FindStop(std::string_view stop_name);
 
-	size_t GetUniqs(const Bus* bus);
+	//size_t GetUniqs(const Bus* bus);
 	Info GetBusInfo(std::string&& bus_name);
 	Info GetStopInfo(std::string&& stop_name);
 

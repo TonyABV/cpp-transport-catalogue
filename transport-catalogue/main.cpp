@@ -48,5 +48,5 @@ int main() {
 	InfillCatalog(tc, move(input_requests));
 	statistic::Requests stat_requests = statistic::MakeRequests(cin);
 	vector<pair<char, Info>> information = GetStatistics(tc, move(stat_requests));
-	statistic::PrinStat(move(information));
+	statistic::PrinStat(cout, move(information));
 }

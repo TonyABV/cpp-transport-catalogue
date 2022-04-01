@@ -17,5 +17,5 @@ struct Requests
 
 Requests MakeRequests(std::istream& input);
 
-void PrinStat(std::vector<std::pair<char, Info>>&& information);
+void PrinStat(std::ostream& out, std::vector<std::pair<char, Info>>&& information);
 }
