@@ -1,4 +1,5 @@
 #include <cassert>
+#include <fstream> 
 #include <iostream>
 #include <istream>
 #include <string>
@@ -6,47 +7,48 @@
 #include <sstream>
 #include <vector>
 
-#include "input_reader.h"
-#include "stat_reader.h"
+#include "domain.h"
+#include "json_reader.h"
+#include "map_renderer.h"
 #include "transport_catalogue.h"
+//#include "stat_reader.h"
 
 using namespace std;
 
-void InfillCatalog(TransportCatalogue& tc, input::Requests&& requests)
+void InfillCatalog(TransportCatalogue& tc, req::BaseRequests& req)
 {
-	for (input::NewStop stop_req : requests.stop_requests_) {
-		tc.AddStop(move(stop_req));
+	for (auto& new_stop : std::get<0>(req)) {
+		tc.AddStop(move(new_stop));
 	}
-	for (input::Distance dist_req : requests.distance_requests_) {
-		tc.AddDist(move(dist_req));
+	for (auto& dist : std::get<1>(req)) {
+		tc.AddDist(move(dist));
 	}
-	for (input::NewBus bus_req : requests.bus_requests_) {
-		tc.AddBus(move(bus_req));
+	for (auto& new_bus : std::get<2>(req)) {
+		tc.AddBus(move(new_bus));
 	}
-}
-
-vector<pair<char, Info>> GetStatistics(TransportCatalogue& tc,
-								statistic::Requests&& requests) 
-{
-	vector<pair<char, Info>> statistics;
-	for (auto request : requests.requests) {
-		if (request.first == 'B') {
-			statistics.push_back(make_pair('B',
-				tc.GetBusInfo(move(request.second))));
-		}
-		else {
-			statistics.push_back(make_pair('S',
-				tc.GetStopInfo(move(request.second))));
-		}
-	}
-	return statistics;
 }
 
 int main() {
-	input::Requests input_requests = input::MakeRequests(cin);
+	/*ifstream input("input.json");
+	ofstream output("output.json");*/
+
+	req::Requests requests = json_input::MakeRequests(cin);
+
 	TransportCatalogue tc;
-	InfillCatalog(tc, move(input_requests));
-	statistic::Requests stat_requests = statistic::MakeRequests(cin);
-	vector<pair<char, Info>> information = GetStatistics(tc, move(stat_requests));
-	statistic::PrinStat(cout, move(information));
+
+	InfillCatalog(tc, get<0>(requests));
+
+	renderer::RenderSettings settings = json_input::GetSettings(get<2>(requests).AsMap());
+
+	renderer::MapRenderer map_renderer(settings);
+
+	RequestHandler handler(tc, map_renderer);
+
+	auto stat = handler.GetStatistics(get<1>(requests));
+
+	json_input::PrintInfo(cout, stat);
+
+	//ofstream output_svg("aaa.svg");
+	/*auto map = handler.InfoForMap();
+	cout << map.map_;*/
 }
