@@ -1,49 +1,50 @@
 #include "request_handler.h"
 
 using namespace std;
+using namespace request;
 
 RequestHandler::RequestHandler(TransportCatalogue& db, const renderer::MapRenderer& rend) : db_(db), renderer_(rend) {}
 
-vector<tuple<char, int, domain::Info>> RequestHandler::GetStatistics(deque<req::StatRequests>& requests)
+vector<tuple<char, int, domain::Stat>> RequestHandler::GetStatistics(deque<request::StatRequests>& requests)
 {
-	vector<tuple<char, int, domain::Info>> statistics;
+	vector<tuple<char, int, domain::Stat>> statistics;
 	for (auto stat_req : requests) {
 		if (get<0>(stat_req) == "Bus") {
 			statistics.push_back(make_tuple('B', get<1>(stat_req),
-				db_.GetBusInfo(move(get<2>(stat_req)))));
+				db_.GetBusStat(move(get<2>(stat_req)))));
 		}
 		else if(get<0>(stat_req) == "Stop"){
 			statistics.push_back(make_tuple('S', get<1>(stat_req),
-				db_.GetStopInfo(move(get<2>(stat_req)))));
+				db_.GetStopStat(move(get<2>(stat_req)))));
 		}
 		else if (get<0>(stat_req) == "Map") {
 			statistics.push_back(make_tuple('M', get<1>(stat_req),
-				 InfoForMap()));
-		}
+				 GetMap()));
+		}/**/
 	}
 	return statistics;
 }
 
-domain::MaxMinLatLon FindMaxMinLatLon(const domain::Bus* busses) {
-	double min_lat = (busses->stops_)[0]->latitude_;
-	double min_lon = (busses->stops_)[0]->longitude_;
+domain::MaxMinLatLon FindMaxMinLatLon(const domain::BusStat* busses) {
+	double min_lat = (busses->stops_on_route_)[0]->coordinates_.lat;
+	double min_lon = (busses->stops_on_route_)[0]->coordinates_.lng;
 	double max_lat = min_lat;
 	double max_lon = min_lon;
-	for (size_t n = 1; n < (busses->stops_.size()); ++n) {
-		min_lat = min(min_lat, (busses->stops_)[n]->latitude_);
-		min_lon = min(min_lon, (busses->stops_)[n]->longitude_);
-		max_lat = max(max_lat, (busses->stops_)[n]->latitude_);
-		max_lon = max(max_lon, (busses->stops_)[n]->longitude_);
+	for (size_t n = 1; n < (busses->stops_on_route_.size()); ++n) {
+		min_lat = min(min_lat, (busses->stops_on_route_)[n]->coordinates_.lat);
+		min_lon = min(min_lon, (busses->stops_on_route_)[n]->coordinates_.lng);
+		max_lat = max(max_lat, (busses->stops_on_route_)[n]->coordinates_.lat);
+		max_lon = max(max_lon, (busses->stops_on_route_)[n]->coordinates_.lng);
 	}
 	
 	return make_pair(make_pair(max_lat, max_lon), make_pair(min_lat, min_lon));
 }
 
-domain::MaxMinLatLon RequestHandler::ComputeMaxMin(deque<const domain::Bus*> busses) {
+domain::MaxMinLatLon RequestHandler::ComputeMaxMin(deque<const domain::BusStat*> busses) {
 	pair<double, double> max_lat_lon;
 	pair<double, double> min_lat_lon;
 	bool is_first = true;
-	for (const domain::Bus* bus : busses) {
+	for (const domain::BusStat* bus : busses) {
 		auto max_min_lat_lon = FindMaxMinLatLon(bus);
 		if (is_first) {
 			max_lat_lon.first = max_min_lat_lon.first.first;
@@ -61,14 +62,15 @@ domain::MaxMinLatLon RequestHandler::ComputeMaxMin(deque<const domain::Bus*> bus
 	return make_pair(max_lat_lon, min_lat_lon);
 }
 
-domain::Info RequestHandler::InfoForMap()
+//domain::BusStat RequestHandler::GetBusStat(std::string&& bus_name) const
+//{
+//	return db_.GetBusStat(move(bus_name));
+//}
+
+domain::Map RequestHandler::GetMap()
 {
-	domain::Info result;
-
-	deque<const domain::Bus*> busses = db_.NonemptyBusses();
+	deque<const domain::BusStat*> busses = db_.GetNonemptyBussesStat();
 	domain::MaxMinLatLon max_min_lat_lon = ComputeMaxMin(busses);
-
-	result.map_ = RequestHandler::renderer_.CreateMap(max_min_lat_lon, busses);
 		
-	return result;
+	return RequestHandler::renderer_.CreateMap(max_min_lat_lon, busses);
 }

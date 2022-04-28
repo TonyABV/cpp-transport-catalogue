@@ -6,35 +6,31 @@
 #include <tuple>
 #include <unordered_set>
 #include <utility>
+#include <variant>
 
 #include "geo.h"
 
 namespace domain {
 
-struct Bus;
+struct StopStat;
+struct BusStat;
+using Map = std::string;
+
+using Stat = std::variant<std::monostate, StopStat, BusStat, Map>;
 
 using MaxMinLatLon = std::pair<std::pair<double, double>,
 								std::pair<double, double>>;
 
-struct Info
-{
-	bool existing_ = false;
-	std::string name_;
-	int stops_on_route_ = 0;
-	int unique_stops_ = 0;
-	double straight_dist_ = 0;
-	int route_length_ = 0;
-	double curvature_ = 0.0;
-	std::set<std::string> busses_to_stop_;
-	std::string map_;
-};
-
 struct Stop
 {
 	std::string name_;
-	double latitude_;
-	double longitude_;
-	std::set<std::string> bus_names_;
+	geo::Coordinates coordinates_;
+};
+
+struct Distance {
+	std::string departure_stop_;
+	std::string destination_;
+	int distance_;
 };
 
 struct StopCmp {
@@ -43,25 +39,56 @@ struct StopCmp {
 	}
 };
 
+struct NewBus
+{
+	std::string name_{};
+	bool route_is_circular_ = false;
+	std::vector<std::string> stops_{};
+	std::string final_stop_name_;
+};
+
 struct Bus
 {
-	std::string name_;
-	bool route_is_circular_;
+	std::string name_{};
+	bool route_is_circular_ = false;
 	std::deque<Stop*> stops_{};
+};
+
+struct BusHasher {
+	size_t operator()(const Bus* bus)const;
+	std::hash<std::string_view> string_haser;
+};
+
+struct BusCmp {
+	bool operator()(const Bus* lhs, const Bus* rhs) const {
+		return lhs->name_ < rhs->name_;
+	}
+};
+
+struct StopStat
+{
+	bool existing_ = false;
+	std::string_view name_{};
+	std::set<Bus*, BusCmp> busses_{};
+};
+
+struct BusStat
+{
+	bool existing_ = false;
+	bool route_is_circular_ = false;
+	std::deque<Stop*> stops_on_route_{};
 	std::set<Stop*, StopCmp> unique_stops_{};
+	std::string_view name_{};
 	double straight_dist_ = 0.0;
 	int route_length_ = 0;
 	double curvature_ = 0.0;
 	Stop* final_stop_{};
 };
 
-Info BusInfo(Bus* bus_ptr);
-Info StopInfo(Stop* bus_ptr);
-
 struct PairBusHasher {
 	size_t operator()(const std::pair<Stop*, Stop*>& busses) const;
-	std::hash<std::string_view> hasher1;
-	std::hash<std::string_view> hasher2;
+	std::hash<std::string_view> string_haser1;
+	std::hash<std::string_view> string_haser2;
 };
 
 double Dist(std::pair<double, double> lati_long_from, std::pair<double, double> lati_long_to);

@@ -19,7 +19,7 @@ class Node;
 class Document;
 using Dict = std::map<std::string, Node>;
 using Array = std::vector<Node>;
-using var_Node = std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string>;
+using VarNode = std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string>;
 
 // Эта ошибка должна выбрасываться при ошибках парсинга JSON
 class ParsingError : public std::runtime_error {
@@ -27,19 +27,13 @@ public:
     using runtime_error::runtime_error;
 };
 
-class Node {
+class Node
+    :private std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string>
+{
 public:
-    Node() = default;
+    using variant::variant;
 
-    template <typename T>
-    Node(T var);
-
-    Node(Document doc);
-
-    Node(var_Node node);
-    Node(Array array_node);
-
-    const var_Node& TakeVar()const;
+    const VarNode& TakeVar()const;
 
     const Array& AsArray() const;
     const Dict& AsMap() const;
@@ -56,9 +50,6 @@ public:
     bool IsDouble() const;
     bool IsPureDouble() const;
     bool IsString() const;
-
-private:
-    var_Node node_;
 };
 
 class Document {
@@ -77,10 +68,6 @@ void Print(const Document& doc, std::ostream& output);
 
 bool operator==(const Node& lhs, const Node& rhs);
 bool operator!=(const Node& lhs, const Node& rhs);
-
-template<typename T>
-inline Node::Node(T var) :node_(var){
-}
 
 struct PrintNodeConverter
 {

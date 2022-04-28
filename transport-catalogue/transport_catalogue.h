@@ -19,22 +19,29 @@ namespace input {
 
 class TransportCatalogue{
 public:
-	void AddStop(input::NewStop&& stop_req);
-	void AddDist(input::Distance&& dist_req);
-	void AddBus(input::NewBus&& bus_req);
+	void AddStop(domain::Stop&& new_stop);
+	void SetDist(domain::Distance&& dist);
+	void AddBus(domain::NewBus&& new_bus);
 
 	domain::Bus* FindBus(std::string_view bus_name) const;
 	domain::Stop* FindStop(std::string_view stop_name)const;
 
-	domain::Info GetBusInfo(std::string&& bus_name) const;
-	domain::Info GetStopInfo(std::string&& stop_name) const;
+	
+	domain::BusStat GetBusStat(const std::string& bus_name) const;
+	domain::StopStat GetStopStat(const std::string& stop_name) const;
 
-	std::deque<const domain::Bus*> NonemptyBusses() const;
+	std::deque<const domain::BusStat*> GetNonemptyBussesStat() const;
 
 private:
 	std::deque<domain::Stop> stops_;
 	std::unordered_map<std::string_view, domain::Stop*> stopname_to_stop_;
+	std::unordered_map<std::string_view, domain::StopStat> stopname_to_stopstat_;
+
+	std::unordered_map < std::string_view, 
+		std::unordered_set < domain::Bus*, domain::BusHasher >> stopname_to_busses_;
+
 	std::deque<domain::Bus> busses_;
 	std::unordered_map<std::string_view, domain::Bus*> busname_to_bus_;
+	std::unordered_map <std::string_view, domain::BusStat> busname_to_busstat_;
 	std::unordered_map<std::pair<domain::Stop*, domain::Stop*>, int, domain::PairBusHasher> from_to_dist;
 };

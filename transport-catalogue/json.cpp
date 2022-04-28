@@ -228,25 +228,14 @@ Node LoadNode(istream& input) {
 
 }  // namespace
 
-Node::Node(Document doc){
-    Node node = doc.GetRoot();
-    node_ = node.TakeVar();
-}
-
-Node::Node(var_Node node) : node_(node){
-}
-
-Node::Node(Array array_node) : node_(array_node){
-}
-
-const var_Node& Node::TakeVar() const
+const VarNode& Node::TakeVar() const
 {
-    return node_;
+    return *this;
 }
 
 const Array& Node::AsArray() const {
     if (IsArray()){
-        return std::get<Array>( node_);
+        return std::get<Array>(*this);
     }else {
         throw(logic_error(""));
     }
@@ -254,7 +243,7 @@ const Array& Node::AsArray() const {
 
 const Dict& Node::AsMap() const {
     if (IsMap()) {
-        return std::get<Dict>(node_);
+        return std::get<Dict>(*this);
     }
     else {
         throw(logic_error(""));
@@ -264,7 +253,7 @@ const Dict& Node::AsMap() const {
 const bool& Node::AsBool() const
 {
     if (IsBool()) {
-        return std::get<bool>(node_);
+        return std::get<bool>(*this);
     }
     else {
         throw(logic_error(""));
@@ -273,7 +262,7 @@ const bool& Node::AsBool() const
 
 int Node::AsInt() const {
     if (IsInt()) {
-        return std::get<int>(node_);
+        return std::get<int>(*this);
     }
     else {
         throw(logic_error(""));
@@ -283,10 +272,10 @@ int Node::AsInt() const {
 double Node::AsDouble() const
 {
     if (IsInt()) {
-        return std::get<int>(node_);
+        return std::get<int>(*this);
     }
     else if (IsDouble()) {
-        return std::get<double>(node_);
+        return std::get<double>(*this);
     }
     else {
         throw(logic_error(""));
@@ -295,7 +284,7 @@ double Node::AsDouble() const
 
 const string& Node::AsString() const {
     if (IsString()) {
-        return std::get<string>(node_);
+        return std::get<string>(*this);
     }
     else {
         throw(logic_error(""));
@@ -303,37 +292,37 @@ const string& Node::AsString() const {
 }
 
 bool Node::IsNull() const{
-    return std::holds_alternative<std::nullptr_t>(node_);
+    return std::holds_alternative<std::nullptr_t>(*this);
 }
 
 bool Node::IsArray() const{
-    return std::holds_alternative<Array>(node_);
+    return std::holds_alternative<Array>(*this);
 }
 
 bool Node::IsMap() const{
-    return std::holds_alternative<Dict>(node_);
+    return std::holds_alternative<Dict>(*this);
 }
 
 bool Node::IsBool() const{
-    return std::holds_alternative<bool>(node_);
+    return std::holds_alternative<bool>(*this);
 }
 
 bool Node::IsInt() const{
-    return std::holds_alternative<int>(node_);
+    return std::holds_alternative<int>(*this);
 }
 
 bool Node::IsDouble() const{
-    return (std::holds_alternative<double>(node_)||
-            std::holds_alternative<int>(node_));
+    return (std::holds_alternative<double>(*this)||
+            std::holds_alternative<int>(*this));
 }
 
 bool Node::IsPureDouble() const
 {
-    return std::holds_alternative<double>(node_);
+    return std::holds_alternative<double>(*this);
 }
 
 bool Node::IsString() const{
-    return std::holds_alternative<string>(node_);
+    return std::holds_alternative<string>(*this);
 }
 
 Document::Document(Node root)

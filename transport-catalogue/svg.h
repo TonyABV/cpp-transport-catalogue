@@ -236,6 +236,7 @@ public:
 
     // Задаёт текстовое содержимое объекта (отображается внутри тега text)
     Text& SetData(std::string data);
+    Text& SetData(std::string_view data);
 
 private:
     void RenderObject(const RenderContext& context) const override;

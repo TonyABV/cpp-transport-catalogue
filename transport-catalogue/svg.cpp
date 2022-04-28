@@ -132,7 +132,14 @@ Text& Text::SetFontWeight(std::string font_weight)
     return *this;
 }
 
+//!!
 Text& Text::SetData(std::string data)
+{
+    text_ = data;
+    return *this;
+}
+
+Text& Text::SetData(std::string_view data)
 {
     text_ = data;
     return *this;

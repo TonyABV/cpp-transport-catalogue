@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "domain.h"
 #include "map_renderer.h"
 #include "transport_catalogue.h"
 #include "json.h"
@@ -12,14 +13,11 @@
 // с другими подсистемами приложения.
 // См. паттерн проектирования Фасад: https://ru.wikipedia.org/wiki/Фасад_(шаблон_проектирования)
 
-namespace req {
-    using NewStop = std::tuple<std::string, double, double>;
-    using Distance = std::pair<std::string, std::vector<std::pair<std::string, int>>>;
-    using NewBus = std::tuple<std::string, bool, std::vector<std::string>, std::string>;
+namespace request {
     using StatRequests = std::tuple<std::string, int, std::string >;
 
-    using BaseRequests = std::tuple< std::deque<NewStop>, std::deque<Distance>,
-        std::deque<NewBus>>;
+    using BaseRequests = std::tuple< std::deque<domain::Stop>, std::deque<domain::Distance>,
+        std::deque<domain::NewBus>>;
 
     using RenderSetings = json::Node;
 
@@ -30,20 +28,16 @@ class RequestHandler {
 public:
     RequestHandler(TransportCatalogue& db, const renderer::MapRenderer& rend);
 
-    std::vector<std::tuple<char, int, domain::Info>> GetStatistics(std::deque<req::StatRequests>& requests);
+    std::vector<std::tuple<char, int, domain::Stat>> GetStatistics(std::deque<request::StatRequests>& requests);
     
-    domain::Info InfoForMap();
+    domain::Map GetMap();
 private:
-    domain::MaxMinLatLon ComputeMaxMin(std::deque<const domain::Bus*> busses);
+    domain::MaxMinLatLon ComputeMaxMin(std::deque<const domain::BusStat*> busses);
     //// MapRenderer понадобится в следующей части итогового проекта
     //RequestHandler(const TransportCatalogue& db, const renderer::MapRenderer& renderer);
-
-    //// Возвращает информацию о маршруте (запрос Bus)
-    //std::optional<BusStat> GetBusStat(const std::string_view& bus_name) const;
-
+    // Возвращает информацию о маршруте (запрос Bus)
     //// Возвращает маршруты, проходящие через
     //const std::unordered_set<BusPtr>* GetBusesByStop(const std::string_view& stop_name) const;
-
     // Этот метод будет нужен в следующей части итогового проекта
     //svg::Document RenderMap() const;
 

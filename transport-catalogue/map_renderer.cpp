@@ -13,7 +13,7 @@ struct RgbRgbaConvert {
     }
 };
 
-std::string renderer::ColorConvertToString(j_Color c)
+std::string renderer::ColorConvertToString(JsonColor c)
 {
     stringstream out;
     if (holds_alternative<vector<uint8_t>>(c)) {
@@ -41,24 +41,24 @@ double MapRenderer::ComputeZoomCoef(const domain::MaxMinLatLon& max_min_lat_lot)
     }
 }
 
-svg::Polyline renderer::MapRenderer::CreateRouteLine(const domain::Bus* bus, double zoom_co,
+svg::Polyline renderer::MapRenderer::CreateRouteLine(const domain::BusStat* bus, double zoom_co,
                                                                    double max_lat, double min_lon) const
 {
     svg::Polyline route;
-    for (const domain::Stop* stop : (*bus).stops_) {
-        double x = (stop->longitude_ - min_lon) * zoom_co + settings_.padding;
-        double y = (max_lat - stop->latitude_) * zoom_co + settings_.padding;
+    for (const domain::Stop* stop : (*bus).stops_on_route_) {
+        double x = (stop->coordinates_.lng - min_lon) * zoom_co + settings_.padding;
+        double y = (max_lat - stop->coordinates_.lat) * zoom_co + settings_.padding;
         svg::Point point{ x, y };
         route.AddPoint(point);
     }
     return route;
 }
 
-void renderer::MapRenderer::AddLines(svg::Document& doc, const std::deque<const domain::Bus*>& busses,
+void renderer::MapRenderer::AddLines(svg::Document& doc, const std::deque<const domain::BusStat*>& busses,
                                                                 double zoom_co, double max_lat, double min_lon) const
 {
     size_t color_index = 0;
-    for (const domain::Bus* bus : busses) {
+    for (const domain::BusStat* bus : busses) {
         doc.Add(CreateRouteLine(bus, zoom_co, max_lat, min_lon)
             .SetStrokeColor(settings_.color_palette[color_index++]).SetFillColor("none").SetStrokeWidth(settings_.line_width)
             .SetStrokeLineCap(svg::StrokeLineCap::ROUND).SetStrokeLineJoin(svg::StrokeLineJoin::ROUND));
@@ -73,30 +73,30 @@ svg::Text renderer::MapRenderer::CreateBusName(const domain::Stop* stop, double 
                                                                 double max_lat, double min_lon) const
 {
     svg::Text name;
-    double x = (stop->longitude_ - min_lon) * zoom_co + settings_.padding;
-    double y = (max_lat - stop->latitude_) * zoom_co + settings_.padding;
+    double x = (stop->coordinates_.lng - min_lon) * zoom_co + settings_.padding;
+    double y = (max_lat - stop->coordinates_.lat) * zoom_co + settings_.padding;
     svg::Point point{ x, y };
     name.SetPosition(point);
     return name;
 }
 
-void renderer::MapRenderer::AddBusNames(svg::Document& doc, const std::deque<const domain::Bus*>& busses, double zoom_co,
+void renderer::MapRenderer::AddBusNames(svg::Document& doc, const std::deque<const domain::BusStat*>& busses, double zoom_co,
                                                                                       double max_lat, double min_lon) const
 {
     size_t color_index = 0;
-    for (const domain::Bus* bus : busses) {
-        doc.Add(CreateBusName((*bus).stops_[0], zoom_co, max_lat, min_lon)
+    for (const domain::BusStat* bus : busses) {
+        doc.Add(CreateBusName((*bus).stops_on_route_[0], zoom_co, max_lat, min_lon)
             .SetOffset(svg::Point{ settings_.bus_label_offset.first, settings_.bus_label_offset.second })
             .SetFontSize(settings_.bus_label_font_size).SetFontFamily("Verdana").SetFontWeight("bold")
             .SetStrokeColor(settings_.underlayer_color).SetFillColor(settings_.underlayer_color)
             .SetStrokeWidth(settings_.underlayer_width)
             .SetStrokeLineCap(svg::StrokeLineCap::ROUND).SetStrokeLineJoin(svg::StrokeLineJoin::ROUND).SetData(bus->name_));
 
-        doc.Add(CreateBusName((*bus).stops_[0], zoom_co, max_lat, min_lon)
+        doc.Add(CreateBusName((*bus).stops_on_route_[0], zoom_co, max_lat, min_lon)
             .SetOffset(svg::Point{ settings_.bus_label_offset.first, settings_.bus_label_offset.second })
             .SetFontSize(settings_.bus_label_font_size).SetFontFamily("Verdana").SetFontWeight("bold")
             .SetFillColor(settings_.color_palette[color_index]).SetData(bus->name_));
-        if (!bus->route_is_circular_ && (bus->final_stop_->name_ != bus->stops_[0]->name_)) {
+        if (!bus->route_is_circular_ && (bus->final_stop_->name_ != bus->stops_on_route_[0]->name_)) {
             doc.Add(CreateBusName(bus->final_stop_, zoom_co, max_lat, min_lon)
                 .SetOffset(svg::Point{ settings_.bus_label_offset.first, settings_.bus_label_offset.second })
                 .SetFontSize(settings_.bus_label_font_size).SetFontFamily("Verdana").SetFontWeight("bold")
@@ -121,17 +121,17 @@ svg::Circle renderer::MapRenderer::CreateToken(const domain::Stop* stop, double 
 {
 
     svg::Circle token;
-    double x = (stop->longitude_ - min_lon) * zoom_co + settings_.padding;
-    double y = (max_lat - stop->latitude_) * zoom_co + settings_.padding;
+    double x = (stop->coordinates_.lng - min_lon) * zoom_co + settings_.padding;
+    double y = (max_lat - stop->coordinates_.lat) * zoom_co + settings_.padding;
     svg::Point point{ x, y };
     token.SetCenter(point);
     return token;
 }
 
-void renderer::MapRenderer::AddTokens(svg::Document& doc, const std::deque<const domain::Bus*>& busses, double zoom_co, double max_lat, double min_lon) const
+void renderer::MapRenderer::AddTokens(svg::Document& doc, const std::deque<const domain::BusStat*>& busses, double zoom_co, double max_lat, double min_lon) const
 {
     set<domain::Stop*, domain::StopCmp> stops;
-    for (const domain::Bus* bus : busses) {
+    for (const domain::BusStat* bus : busses) {
         stops.insert(bus->unique_stops_.begin(), bus->unique_stops_.end());
     }
     for (domain::Stop* stop : stops) {
@@ -144,17 +144,17 @@ void renderer::MapRenderer::AddTokens(svg::Document& doc, const std::deque<const
 svg::Text renderer::MapRenderer::CreateStopName(const domain::Stop* stop, double zoom_co, double max_lat, double min_lon) const
 {
     svg::Text stop_name;
-    double x = (stop->longitude_ - min_lon) * zoom_co + settings_.padding;
-    double y = (max_lat - stop->latitude_) * zoom_co + settings_.padding;
+    double x = (stop->coordinates_.lng - min_lon) * zoom_co + settings_.padding;
+    double y = (max_lat - stop->coordinates_.lat) * zoom_co + settings_.padding;
     svg::Point point{ x, y };
     stop_name.SetPosition(point);
     return stop_name;
 }
 
-void renderer::MapRenderer::AddStopNames(svg::Document& doc, const std::deque<const domain::Bus*>& busses, double zoom_co, double max_lat, double min_lon) const
+void renderer::MapRenderer::AddStopNames(svg::Document& doc, const std::deque<const domain::BusStat*>& busses, double zoom_co, double max_lat, double min_lon) const
 {
     set<domain::Stop*, domain::StopCmp> stops;
-    for (const domain::Bus* bus : busses) {
+    for (const domain::BusStat* bus : busses) {
         stops.insert(bus->unique_stops_.begin(), bus->unique_stops_.end());
     }
     for (domain::Stop* stop : stops) {
@@ -177,12 +177,12 @@ void renderer::MapRenderer::AddStopNames(svg::Document& doc, const std::deque<co
     }
 }
 
-std::string renderer::MapRenderer::CreateMap(domain::MaxMinLatLon max_min_lat_lon, deque<const domain::Bus*> busses) const
+std::string renderer::MapRenderer::CreateMap(domain::MaxMinLatLon max_min_lat_lon, deque<const domain::BusStat*> busses) const
 {
     double zoom_co = MapRenderer::ComputeZoomCoef(max_min_lat_lon);
 
     sort(busses.begin(), busses.end(), 
-        [](const domain::Bus* lhs, const domain::Bus* rhs) {return (*lhs).name_ < (*rhs).name_;});
+        [](const domain::BusStat* lhs, const domain::BusStat* rhs) {return (*lhs).name_ < (*rhs).name_;});
 
     svg::Document doc;
     AddLines(doc, busses, zoom_co, max_min_lat_lon.first.first, max_min_lat_lon.second.second);    
@@ -196,6 +196,4 @@ std::string renderer::MapRenderer::CreateMap(domain::MaxMinLatLon max_min_lat_lo
     return out.str();
 }
 
-renderer::MapRenderer::MapRenderer(const renderer::RenderSettings& set):settings_(set)
-{
-}
+renderer::MapRenderer::MapRenderer(const renderer::RenderSettings& set):settings_(set){}

@@ -39,32 +39,34 @@ statistic::Requests statistic::MakeRequests(istream& input)
 	return result;
 }
 
-void statistic::PrinStat(ostream& out, vector<pair<char, Info>>&& information){
-	for (auto info : information) {
-		if (info.first == 'B') {
-			out << "Bus " << info.second.name_ << ": ";
-			if (!info.second.existing_) {
+void statistic::PrinStat(ostream& out, vector<pair<char, domain::Stat>>&& information){
+	for (auto stat : information) {
+		if (stat.first == 'B') {
+			domain::BusStat busstat = get<domain::BusStat>(stat.second);
+			out << "Bus " << busstat.name_ << ": ";
+			if (!busstat.existing_) {
 				out << "not found" << endl;
 				continue;
 			}
-				out << info.second.stops_on_route_ << " stops on route, " <<
-				info.second.unique_stops_ << " unique stops, "<<
-				info.second.route_length_ << " route length, " <<
-					setprecision(6)<< info.second.curvature_<< " curvature" << endl;
+				out << busstat.stops_on_route_.size() << " stops on route, " <<
+					busstat.unique_stops_.size() << " unique stops, "<<
+					busstat.route_length_ << " route length, " <<
+					setprecision(6) << busstat.curvature_<< " curvature" << endl;
 		}
 		else {
-			out << "Stop " << info.second.name_ << ": ";
-			if (!info.second.existing_) {
+			domain::StopStat stopstat = get<domain::StopStat>(stat.second);
+			out << "Stop " << stopstat.name_ << ": ";
+			if (!stopstat.existing_) {
 				out << "not found" << endl;
 			}
-			else if (info.second.busses_to_stop_.empty()) {
+			else if (stopstat.busses_.empty()) {
 				out << "no buses" << endl;
 			}
 			else
 			{
 				out << "buses ";
-				for (auto bus_name : info.second.busses_to_stop_) {
-					out << bus_name << ' ';
+				for (domain::Bus* bus : stopstat.busses_) {
+					out << bus->name_ << ' ';
 				}
 				out << endl;
 			}

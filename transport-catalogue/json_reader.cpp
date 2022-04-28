@@ -1,28 +1,28 @@
-using namespace renderer;
-using namespace json_input;
-using namespace req;
-using namespace std;
-
 #include "json_reader.h"
 
+using namespace renderer;
+using namespace json_input;
+using namespace request;
+using namespace std;
 
-pair<NewStop, Distance> json_input::AdaptStopReq(const map<string, json::Node>& bus_req)
+
+pair<domain::Stop, deque<domain::Distance>>
+        json_input::AdaptStopReq(const map<string, json::Node>& bus_req)
 {
     string stop_name = bus_req.at("name").AsString();
-    NewStop stop = make_tuple(stop_name, bus_req.at("latitude").AsDouble(),
-        bus_req.at("longitude").AsDouble());
-
-    vector<pair<string, int>> to_stop_dist;
+    double latitude = bus_req.at("latitude").AsDouble();
+    double longitude = bus_req.at("longitude").AsDouble();
+    domain::Stop new_stop{ stop_name, {latitude,longitude} };
+    deque<domain::Distance> new_distances;
     for (auto& dist : bus_req.at("road_distances").AsMap()) {
-        to_stop_dist.push_back(make_pair(dist.first, dist.second.AsInt()));
+        domain::Distance new_distance{stop_name, dist.first, dist.second.AsInt()};
+        new_distances.push_back(move(new_distance));
     }
-    Distance dist = make_pair(stop_name, to_stop_dist);
-    return make_pair(stop, dist);
+    return make_pair(new_stop, new_distances);
 }
 
-NewBus json_input::AdaptBusReq(const std::map<std::string, json::Node>& bus_req)
+domain::NewBus json_input::AdaptBusReq(const std::map<std::string, json::Node>& bus_req)
 {
-    NewBus bus;
     string bus_name = bus_req.at("name").AsString();
     bool is_roundtrip = bus_req.at("is_roundtrip").AsBool();
     vector<json::Node> n_stops = bus_req.at("stops").AsArray();
@@ -41,28 +41,30 @@ NewBus json_input::AdaptBusReq(const std::map<std::string, json::Node>& bus_req)
             stops.push_back(stops[old_size - 1 - n]);
         }
     }
-    return make_tuple(bus_name, is_roundtrip, stops, final_stop);
+
+    return domain::NewBus{bus_name, is_roundtrip, stops, final_stop};
 }
 
-tuple<deque<NewStop>, deque<Distance>, deque<NewBus>> json_input::MakeBaseReq(vector<json::Node>& base_req)
+tuple<deque<domain::Stop>, deque<domain::Distance>, deque<domain::NewBus>>
+                        json_input::MakeBaseReq(vector<json::Node>& base_req)
 {
-    deque<NewStop> stop_req;
-    deque<Distance> dist_req;
-    deque<NewBus> bus_req;
+    deque<domain::Stop> new_stops;
+    deque<domain::Distance> new_distances;
+    deque<domain::NewBus> new_busses;
 
     for (json::Node& req : base_req) {
         auto& as_map = req.AsMap();
         string_view req_type = as_map.at("type").AsString();
         if (req_type == "Stop") {
-            auto adapted_req = AdaptStopReq(as_map);
-            stop_req.push_back(adapted_req.first);
-            dist_req.push_back(adapted_req.second);
+            auto adapted_req = json_input::AdaptStopReq(as_map);
+            new_stops.push_back(move(adapted_req.first));
+            new_distances.insert(new_distances.end(), adapted_req.second.begin(), adapted_req.second.end());
         }
         else {
-            bus_req.push_back(AdaptBusReq(as_map));
+            new_busses.push_back(json_input::AdaptBusReq(as_map));
         }
     }
-    return make_tuple(stop_req, dist_req, bus_req);
+    return make_tuple(new_stops, new_distances, new_busses);
 }
 
 deque<StatRequests> json_input::MakeStatReq(vector<json::Node>& stat_req)
@@ -82,7 +84,7 @@ deque<StatRequests> json_input::MakeStatReq(vector<json::Node>& stat_req)
     return result;
 }
 
-Requests json_input::MakeRequests(std::istream& input)
+request::Requests json_input::MakeRequests(std::istream& input)
 {
     json::Node node = json::Load(input).GetRoot();
     vector<json::Node> array_base_req(node.AsMap().at("base_requests").AsArray());
@@ -93,20 +95,21 @@ Requests json_input::MakeRequests(std::istream& input)
     return make_tuple(base_req, stat_req, node.AsMap().at("render_settings"));
 }
 
-
-
- json::Node json_input::AdaptToJson(std::vector<std::tuple<char, int, domain::Info>>& stat)
+ json::Node json_input::AdaptToJson(std::vector<std::tuple<char, int, domain::Stat>>& stat)
 {
     json::Array arr;
-    for (auto& st : stat) {
+    for (const auto& st : stat) {
         json::Dict dict;
+
         dict["request_id"] = json::Node(get<1>(st));
-        domain::Info info = get<2>(st);
-        if (get<0>(st) == 'S') {
-            if (info.existing_) {
+        char flag = get<0>(st);
+        domain::Stat stat = get<2>(st);
+
+        if (flag == 'S') {
+            if (get<domain::StopStat>(stat).existing_) {
                 json::Array busses;
-                for (string stop : info.busses_to_stop_) {
-                    busses.push_back(json::Node(stop));
+                for (domain::Bus* bus : get<domain::StopStat>(stat).busses_) {
+                    busses.push_back(json::Node(bus->name_));
                 }
                 dict["buses"] = json::Node(busses);
             }
@@ -114,26 +117,26 @@ Requests json_input::MakeRequests(std::istream& input)
                 dict["error_message"] = json::Node("not found"s);
             }
         }
-        else if(get<0>(st) == 'B') {
-            if (info.existing_) {
-                dict["curvature"] = json::Node(info.curvature_);
-                dict["route_length"] = json::Node(info.route_length_);
-                dict["stop_count"] = json::Node(info.stops_on_route_);
-                dict["unique_stop_count"] = json::Node(info.unique_stops_);/**/
+        else if(flag == 'B') {
+            if (get<domain::BusStat>(stat).existing_) {
+                dict["curvature"] = json::Node(get<domain::BusStat>(stat).curvature_);
+                dict["route_length"] = json::Node(get<domain::BusStat>(stat).route_length_);
+                dict["stop_count"] = json::Node(static_cast<int>(get<domain::BusStat>(stat).stops_on_route_.size()));
+                dict["unique_stop_count"] = json::Node(static_cast<int>(get<domain::BusStat>(stat).unique_stops_.size()));/**/
             }
             else {
                 dict["error_message"] = json::Node("not found"s);
             }
         }
-        else if (get<0>(st) == 'M') {
-            dict["map"] = json::Node(info.map_);
+        else if (flag == 'M') {
+            dict["map"] = json::Node(get<domain::Map>(stat));
         }
         arr.push_back(dict);
     }
     return json::Node(arr);
 }
 
- void json_input::PrintInfo(std::ostream& out, vector<tuple<char, int, domain::Info>>& stat)
+ void json_input::PrintInfo(std::ostream& out, vector<tuple<char, int, domain::Stat>>& stat)
  {
      json::Node node = AdaptToJson(stat);
      json::Print(json::Document(node), out);
@@ -146,18 +149,18 @@ Requests json_input::MakeRequests(std::istream& input)
          rgb_color.push_back(color[0].AsInt());
          rgb_color.push_back(color[1].AsInt());
          rgb_color.push_back(color[2].AsInt());
-         return ColorConvertToString(rgb_color);
+         return  renderer::ColorConvertToString(rgb_color);
      }
      else {
          tuple<uint8_t, uint8_t, uint8_t, double> rgba_color{ color[0].AsInt(), color[1].AsInt(),
                                                     color[2].AsInt(), color[3].AsDouble() };
-         return ColorConvertToString(rgba_color);
+         return  renderer::ColorConvertToString(rgba_color);
      }
  }
 
- RenderSettings json_input::GetSettings(const json::Dict& render_set)
+ renderer::RenderSettings json_input::GetSettings(const json::Dict& render_set)
  {
-     RenderSettings result;
+     renderer::RenderSettings result;
      
      result.width = (*render_set.find("width")).second.AsDouble();
      result.height = (*render_set.find("height")).second.AsDouble();
