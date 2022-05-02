@@ -17,9 +17,9 @@
 namespace json_input {
 	std::pair<domain::Stop, std::deque<domain::Distance>> 
 		AdaptStopReq(const std::map < std::string, json::Node>& stop_req);
-	domain::NewBus AdaptBusReq(const std::map < std::string, json::Node>& bus_req);
+	request::RawBus AdaptBusReq(const std::map < std::string, json::Node>& bus_req);
 
-	std::tuple<std::deque<domain::Stop>, std::deque<domain::Distance>, std::deque<domain::NewBus>>
+	std::tuple<std::deque<domain::Stop>, std::deque<domain::Distance>, std::deque<request::RawBus>>
 		MakeBaseReq(std::vector<json::Node>& base_req);
 
 	std::deque<request::StatRequests> MakeStatReq(std::vector<json::Node>& stat_req);

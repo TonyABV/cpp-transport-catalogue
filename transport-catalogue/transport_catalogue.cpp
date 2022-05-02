@@ -20,51 +20,35 @@ void TransportCatalogue::AddStop(domain::Stop&& new_stop)
 
 void TransportCatalogue::SetDist(domain::Distance&& dist)
 {
-	Stop* stop_from = FindStop(dist.departure_stop_);
+	Stop* stop_from = FindStop(dist.departure_);
 	Stop* stop_to = FindStop(dist.destination_);
 	pair from_to = make_pair(stop_from, stop_to);
 	from_to_dist[from_to] = dist.distance_;
 }
 
-void TransportCatalogue::AddBus(domain::NewBus&& new_bus)
+void TransportCatalogue::UpdateStat()
 {
-	Bus n_bus{ new_bus.name_, new_bus.route_is_circular_, {} };
+	auto& bus = busses_.back();
+
 	BusStat bus_stat;
 
-	busses_.push_back(move(n_bus));
-	auto& bus = busses_.back();/**/
-
-	bus_stat.existing_ = true;
-	bus_stat.route_is_circular_ = bus.route_is_circular_;
 	bus_stat.name_ = bus.name_;
-	bus_stat.final_stop_ = FindStop(new_bus.final_stop_name_);
-
-	deque<Stop*> stops;
-	set<Stop*, StopCmp> uniq_stops;
+	bus_stat.existing_ = true;
 
 	double straight_dist = 0;
 	int route_length = 0;
 
-	string& firststop_name = new_bus.stops_[0];
-	Stop* firststop_ptr = FindStop(firststop_name);
+	Stop* stop_from = bus.stops_[0];
 
-	uniq_stops.insert(FindStop(firststop_ptr->name_));
-	stops.push_back(firststop_ptr);
-
-	auto stop_stat_it = stopname_to_stopstat_.find(firststop_name);
+	auto stop_stat_it = stopname_to_stopstat_.find(stop_from->name_);
 	(*stop_stat_it).second.busses_.insert(&bus);
 
-	pair<double, double> from{ firststop_ptr->coordinates_.lat, firststop_ptr->coordinates_.lng };
+	pair<double, double> from{ stop_from->coordinates_.lat, stop_from->coordinates_.lng };
 
-	Stop* stop_from = firststop_ptr;
-	for (size_t n = 1; n < new_bus.stops_.size(); ++n)
+	for (size_t n = 1; n < bus.stops_.size(); ++n)
 	{
-		string& stop_name = new_bus.stops_[n];
-		Stop* stop_to = FindStop(stop_name);
-
-		uniq_stops.insert(FindStop(stop_to->name_));
-		stops.push_back(stop_to);
-		auto stop_stat_it = stopname_to_stopstat_.find(stop_name);
+		Stop* stop_to = bus.stops_[n];
+		auto stop_stat_it = stopname_to_stopstat_.find(stop_to->name_);
 		(*stop_stat_it).second.busses_.insert(&bus);
 
 		pair<double, double> to{ stop_to->coordinates_.lat, stop_to->coordinates_.lng };
@@ -86,19 +70,26 @@ void TransportCatalogue::AddBus(domain::NewBus&& new_bus)
 		stop_from = stop_to;
 	}
 
-	bus_stat.straight_dist_ = straight_dist;
 	bus_stat.route_length_ = route_length;
 	bus_stat.curvature_ = route_length / straight_dist;
-	bus_stat.unique_stops_ = move(uniq_stops);
-	bus_stat.stops_on_route_ = stops;
+	bus_stat.unique_stops_count_ = bus.unique_stops_.size();
+	bus_stat.stops_count_ = bus.stops_.size();
 
-	bus.stops_ = move(stops);
 	busname_to_bus_[bus.name_] = &bus;
 	busname_to_busstat_[bus.name_] = bus_stat;
-	/*bus.straight_dist_ = straight_dist;
-	bus.route_length_ = route_length;
-	bus.curvature_ = route_length / straight_dist;
-	bus.unique_stops_ = move(uniq_stops);*/
+}
+
+void TransportCatalogue::AddBus(domain::Bus&& new_bus)
+{
+	if (!new_bus.route_is_circular_) {
+		size_t old_size = new_bus.stops_.size();
+		for (size_t n = 1; n < old_size; ++n) {
+			new_bus.stops_.push_back(new_bus.stops_[old_size - 1 - n]);
+		}
+	}
+
+	busses_.push_back(move(new_bus));
+	UpdateStat();
 }
 
 Bus* TransportCatalogue::FindBus(string_view bus_name) const
@@ -131,9 +122,8 @@ domain::BusStat TransportCatalogue::GetBusStat(const string& bus_name) const
 {
 	auto busstat_it = busname_to_busstat_.find(bus_name);
 	if (busstat_it == busname_to_busstat_.end()) {
-		domain::BusStat busstat;
-		busstat.name_ = bus_name;
-		return busstat;
+		
+		return domain::BusStat{};
 	}
 	return (*busstat_it).second;
 }
@@ -149,11 +139,22 @@ domain::StopStat TransportCatalogue::GetStopStat(const std::string& stop_name) c
 	return (*stopstat_it).second;
 }
 
+std::deque<const domain::Bus*> TransportCatalogue::GetNonemptyBusses() const
+{
+	deque<const domain::Bus*> result;
+	for (auto& bus_ref : busses_) {
+		if (!bus_ref.stops_.empty()) {
+			result.push_back(&(bus_ref));
+		}
+	}
+	return result;
+}
+
 deque<const domain::BusStat*> TransportCatalogue::GetNonemptyBussesStat() const
 {
 	deque<const domain::BusStat*> result;
 	for (auto& bus_ref : busname_to_busstat_) {
-		if (!bus_ref.second.stops_on_route_.empty()) {
+		if (!bus_ref.second.stops_count_ == 0) {
 			result.push_back(&(bus_ref.second));
 		}
 	}

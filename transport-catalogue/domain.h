@@ -14,6 +14,7 @@ namespace domain {
 
 struct StopStat;
 struct BusStat;
+
 using Map = std::string;
 
 using Stat = std::variant<std::monostate, StopStat, BusStat, Map>;
@@ -28,7 +29,7 @@ struct Stop
 };
 
 struct Distance {
-	std::string departure_stop_;
+	std::string departure_;
 	std::string destination_;
 	int distance_;
 };
@@ -39,19 +40,12 @@ struct StopCmp {
 	}
 };
 
-struct NewBus
-{
-	std::string name_{};
-	bool route_is_circular_ = false;
-	std::vector<std::string> stops_{};
-	std::string final_stop_name_;
-};
-
 struct Bus
 {
 	std::string name_{};
 	bool route_is_circular_ = false;
-	std::deque<Stop*> stops_{};
+	std::deque<domain::Stop*> stops_{};
+	std::set<Stop*, StopCmp> unique_stops_{};
 };
 
 struct BusHasher {
@@ -75,14 +69,11 @@ struct StopStat
 struct BusStat
 {
 	bool existing_ = false;
-	bool route_is_circular_ = false;
-	std::deque<Stop*> stops_on_route_{};
-	std::set<Stop*, StopCmp> unique_stops_{};
 	std::string_view name_{};
-	double straight_dist_ = 0.0;
+	size_t stops_count_{};
+	size_t unique_stops_count_{};
 	int route_length_ = 0;
 	double curvature_ = 0.0;
-	Stop* final_stop_{};
 };
 
 struct PairBusHasher {

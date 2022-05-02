@@ -14,10 +14,16 @@
 // См. паттерн проектирования Фасад: https://ru.wikipedia.org/wiki/Фасад_(шаблон_проектирования)
 
 namespace request {
+    struct RawBus {
+        std::string name_;
+        bool route_is_circular_ = false;
+        std::deque<std::string> stops_{};
+    };
+
     using StatRequests = std::tuple<std::string, int, std::string >;
 
     using BaseRequests = std::tuple< std::deque<domain::Stop>, std::deque<domain::Distance>,
-        std::deque<domain::NewBus>>;
+        std::deque<RawBus>>;
 
     using RenderSetings = json::Node;
 
@@ -26,24 +32,10 @@ namespace request {
 
 class RequestHandler {
 public:
-    RequestHandler(TransportCatalogue& db, const renderer::MapRenderer& rend);
-
+    RequestHandler(TransportCatalogue& db, const renderer::MapRenderer& renderer);
     std::vector<std::tuple<char, int, domain::Stat>> GetStatistics(std::deque<request::StatRequests>& requests);
-    
     domain::Map GetMap();
 private:
-    domain::MaxMinLatLon ComputeMaxMin(std::deque<const domain::BusStat*> busses);
-    //// MapRenderer понадобится в следующей части итогового проекта
-    //RequestHandler(const TransportCatalogue& db, const renderer::MapRenderer& renderer);
-    // Возвращает информацию о маршруте (запрос Bus)
-    //// Возвращает маршруты, проходящие через
-    //const std::unordered_set<BusPtr>* GetBusesByStop(const std::string_view& stop_name) const;
-    // Этот метод будет нужен в следующей части итогового проекта
-    //svg::Document RenderMap() const;
-
-private:
-    //// RequestHandler использует агрегацию объектов "Транспортный Справочник" и "Визуализатор Карты"
-
     const TransportCatalogue& db_;
     const renderer::MapRenderer& renderer_;
 };

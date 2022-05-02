@@ -48,8 +48,8 @@ void statistic::PrinStat(ostream& out, vector<pair<char, domain::Stat>>&& inform
 				out << "not found" << endl;
 				continue;
 			}
-				out << busstat.stops_on_route_.size() << " stops on route, " <<
-					busstat.unique_stops_.size() << " unique stops, "<<
+				out << busstat.stops_count_ << " stops on route, " <<
+					busstat.unique_stops_count_ << " unique stops, "<<
 					busstat.route_length_ << " route length, " <<
 					setprecision(6) << busstat.curvature_<< " curvature" << endl;
 		}

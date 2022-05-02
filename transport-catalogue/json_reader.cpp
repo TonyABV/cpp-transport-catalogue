@@ -21,36 +21,26 @@ pair<domain::Stop, deque<domain::Distance>>
     return make_pair(new_stop, new_distances);
 }
 
-domain::NewBus json_input::AdaptBusReq(const std::map<std::string, json::Node>& bus_req)
+request::RawBus json_input::AdaptBusReq(const std::map<std::string, json::Node>& bus_req)
 {
     string bus_name = bus_req.at("name").AsString();
     bool is_roundtrip = bus_req.at("is_roundtrip").AsBool();
     vector<json::Node> n_stops = bus_req.at("stops").AsArray();
 
-    vector<string> stops;
+    deque<string> stops;
     for (auto& node : n_stops) {
         stops.push_back(node.AsString());
     }
 
-    std::string final_stop = stops.back();
-
-    if (!is_roundtrip) {
-        size_t old_size = stops.size();
-        stops.reserve(old_size * 2 - 1);
-        for (size_t n = 1; n < old_size; ++n) {
-            stops.push_back(stops[old_size - 1 - n]);
-        }
-    }
-
-    return domain::NewBus{bus_name, is_roundtrip, stops, final_stop};
+    return request::RawBus{bus_name, is_roundtrip, stops};
 }
 
-tuple<deque<domain::Stop>, deque<domain::Distance>, deque<domain::NewBus>>
+tuple<deque<domain::Stop>, deque<domain::Distance>, deque<request::RawBus>>
                         json_input::MakeBaseReq(vector<json::Node>& base_req)
 {
     deque<domain::Stop> new_stops;
     deque<domain::Distance> new_distances;
-    deque<domain::NewBus> new_busses;
+    deque<request::RawBus> new_busses;
 
     for (json::Node& req : base_req) {
         auto& as_map = req.AsMap();
@@ -121,8 +111,8 @@ request::Requests json_input::MakeRequests(std::istream& input)
             if (get<domain::BusStat>(stat).existing_) {
                 dict["curvature"] = json::Node(get<domain::BusStat>(stat).curvature_);
                 dict["route_length"] = json::Node(get<domain::BusStat>(stat).route_length_);
-                dict["stop_count"] = json::Node(static_cast<int>(get<domain::BusStat>(stat).stops_on_route_.size()));
-                dict["unique_stop_count"] = json::Node(static_cast<int>(get<domain::BusStat>(stat).unique_stops_.size()));/**/
+                dict["stop_count"] = json::Node(static_cast<int>(get<domain::BusStat>(stat).stops_count_));
+                dict["unique_stop_count"] = json::Node(static_cast<int>(get<domain::BusStat>(stat).unique_stops_count_));
             }
             else {
                 dict["error_message"] = json::Node("not found"s);

@@ -14,6 +14,16 @@
 
 using namespace std;
 
+domain::Bus PrepareNewBus(const TransportCatalogue& tc, request::RawBus& raw_bus) {
+	domain::Bus bus{raw_bus.name_, raw_bus.route_is_circular_};
+	for (auto& stop_name : raw_bus.stops_) {
+		domain::Stop* stop = tc.FindStop(stop_name);
+		bus.stops_.push_back(stop);
+		bus.unique_stops_.insert(stop);
+	}
+	return bus;
+}
+
 void InfillCatalog(TransportCatalogue& tc, request::BaseRequests& req)
 {
 	for (auto& new_stop : std::get<0>(req)) {
@@ -22,8 +32,8 @@ void InfillCatalog(TransportCatalogue& tc, request::BaseRequests& req)
 	for (auto& dist : std::get<1>(req)) {
 		tc.SetDist(move(dist));
 	}
-	for (auto& new_bus : std::get<2>(req)) {
-		tc.AddBus(move(new_bus));
+	for (auto& raw_bus : std::get<2>(req)) {
+		tc.AddBus(move(PrepareNewBus(tc, raw_bus)));
 	}
 }
 

@@ -11,17 +11,11 @@
 
 #include "domain.h"
 
-namespace input {
-	using NewStop = std::tuple<std::string, double, double>;
-	using Distance = std::pair<std::string, std::vector<std::pair<std::string, int>>>;
-	using NewBus = std::tuple<std::string, bool, std::vector<std::string>, std::string>;
-}
-
 class TransportCatalogue{
 public:
 	void AddStop(domain::Stop&& new_stop);
 	void SetDist(domain::Distance&& dist);
-	void AddBus(domain::NewBus&& new_bus);
+	void AddBus(domain::Bus&& new_bus);
 
 	domain::Bus* FindBus(std::string_view bus_name) const;
 	domain::Stop* FindStop(std::string_view stop_name)const;
@@ -30,9 +24,12 @@ public:
 	domain::BusStat GetBusStat(const std::string& bus_name) const;
 	domain::StopStat GetStopStat(const std::string& stop_name) const;
 
+	std::deque<const domain::Bus*> GetNonemptyBusses() const;
 	std::deque<const domain::BusStat*> GetNonemptyBussesStat() const;
 
 private:
+	void UpdateStat();
+
 	std::deque<domain::Stop> stops_;
 	std::unordered_map<std::string_view, domain::Stop*> stopname_to_stop_;
 	std::unordered_map<std::string_view, domain::StopStat> stopname_to_stopstat_;
