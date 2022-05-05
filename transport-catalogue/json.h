@@ -19,7 +19,6 @@ class Node;
 class Document;
 using Dict = std::map<std::string, Node>;
 using Array = std::vector<Node>;
-using VarNode = std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string>;
 
 // Эта ошибка должна выбрасываться при ошибках парсинга JSON
 class ParsingError : public std::runtime_error {
@@ -27,13 +26,16 @@ public:
     using runtime_error::runtime_error;
 };
 
-class Node
+class Node final
     :private std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string>
 {
 public:
     using variant::variant;
+    using Value = variant;
 
-    const VarNode& TakeVar()const;
+    //const VarNode& TakeVar()const;
+    const Value& GetValue() const;
+    Value& GetValue();
 
     const Array& AsArray() const;
     const Dict& AsMap() const;
@@ -44,7 +46,7 @@ public:
 
     bool IsNull() const;
     bool IsArray()const;
-    bool IsMap() const;
+    bool IsDict() const;
     bool IsBool() const;
     bool IsInt() const;
     bool IsDouble() const;

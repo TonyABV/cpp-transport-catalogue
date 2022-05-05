@@ -228,8 +228,12 @@ Node LoadNode(istream& input) {
 
 }  // namespace
 
-const VarNode& Node::TakeVar() const
+const Node::Value& Node::GetValue() const
 {
+    return *this;
+}
+
+Node::Value& Node::GetValue() {
     return *this;
 }
 
@@ -242,7 +246,7 @@ const Array& Node::AsArray() const {
 }
 
 const Dict& Node::AsMap() const {
-    if (IsMap()) {
+    if (IsDict()) {
         return std::get<Dict>(*this);
     }
     else {
@@ -299,7 +303,7 @@ bool Node::IsArray() const{
     return std::holds_alternative<Array>(*this);
 }
 
-bool Node::IsMap() const{
+bool Node::IsDict() const{
     return std::holds_alternative<Dict>(*this);
 }
 
@@ -339,7 +343,7 @@ Document Load(istream& input) {
 
 void Print(const Document& doc, std::ostream& output) {
     const Node& node = doc.GetRoot();
-    (std::visit(PrintNodeConverter{ output }, node.TakeVar()));
+    (std::visit(PrintNodeConverter{ output }, node.GetValue()));
 }
 
 bool operator==(const Node& lhs, const Node& rhs)
@@ -356,8 +360,8 @@ bool operator==(const Node& lhs, const Node& rhs)
         }
         return false;
     }
-    else if (lhs.IsMap()) {
-        if (rhs.IsMap()) {
+    else if (lhs.IsDict()) {
+        if (rhs.IsDict()) {
             return lhs.AsMap() == rhs.AsMap();
         }
         return false;
@@ -405,12 +409,12 @@ std::ostream& PrintNodeConverter::operator()(Array array) const
     bool is_first = true;
     for (const auto& node : array) {
         if(is_first){
-            std::visit(PrintNodeConverter{ out_ }, node.TakeVar());
+            std::visit(PrintNodeConverter{ out_ }, node.GetValue());
             is_first = false;
             continue;
         }
         out_ << ", ";
-        std::visit(PrintNodeConverter{ out_ }, node.TakeVar());
+        std::visit(PrintNodeConverter{ out_ }, node.GetValue());
     }
     out_ << "]";
     return out_;
@@ -423,13 +427,13 @@ std::ostream& PrintNodeConverter::operator()(Dict dict) const
     for (const auto& key_node : dict) {
         if (is_first) {
             out_ << "\"" << key_node.first << "\": ";
-            std::visit(PrintNodeConverter{ out_ }, key_node.second.TakeVar());
+            std::visit(PrintNodeConverter{ out_ }, key_node.second.GetValue());
             is_first = false;
             continue;
         }
         out_ << ", ";
         out_ << "\"" << key_node.first << "\": ";
-        std::visit(PrintNodeConverter{ out_ }, key_node.second.TakeVar());
+        std::visit(PrintNodeConverter{ out_ }, key_node.second.GetValue());
     }
     out_ << "}";
     return out_;

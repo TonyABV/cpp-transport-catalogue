@@ -85,45 +85,48 @@ request::Requests json_input::MakeRequests(std::istream& input)
     return make_tuple(base_req, stat_req, node.AsMap().at("render_settings"));
 }
 
- json::Node json_input::AdaptToJson(std::vector<std::tuple<char, int, domain::Stat>>& stat)
+json::Node json_input::AdaptToJson(std::vector<std::tuple<char, int, domain::Stat>>& statistics)
 {
-    json::Array arr;
-    for (const auto& st : stat) {
-        json::Dict dict;
+    json::Builder builder{};
+    builder.StartArray();
+    for (const auto& stat : statistics) {
+        builder.StartDict().Key("request_id"s).Value(get<1>(stat));
 
-        dict["request_id"] = json::Node(get<1>(st));
-        char flag = get<0>(st);
-        domain::Stat stat = get<2>(st);
+        char flag = get<0>(stat);
+        domain::Stat variant_stat = get<2>(stat);
 
         if (flag == 'S') {
-            if (get<domain::StopStat>(stat).existing_) {
-                json::Array busses;
-                for (domain::Bus* bus : get<domain::StopStat>(stat).busses_) {
-                    busses.push_back(json::Node(bus->name_));
+            domain::StopStat stop_stat = get<domain::StopStat>(variant_stat);
+            if (stop_stat.existing_) {
+
+                builder.Key("buses"s).StartArray();
+                for (domain::Bus* bus : stop_stat.busses_) {
+                    builder.Value(bus->name_);
                 }
-                dict["buses"] = json::Node(busses);
+                builder.EndArray();
             }
             else {
-                dict["error_message"] = json::Node("not found"s);
+                builder.Key("error_message"s).Value("not found"s);
             }
         }
         else if(flag == 'B') {
-            if (get<domain::BusStat>(stat).existing_) {
-                dict["curvature"] = json::Node(get<domain::BusStat>(stat).curvature_);
-                dict["route_length"] = json::Node(get<domain::BusStat>(stat).route_length_);
-                dict["stop_count"] = json::Node(static_cast<int>(get<domain::BusStat>(stat).stops_count_));
-                dict["unique_stop_count"] = json::Node(static_cast<int>(get<domain::BusStat>(stat).unique_stops_count_));
+            domain::BusStat bus_stat = get<domain::BusStat>(variant_stat);
+            if (bus_stat.existing_) {
+                 builder.Key("curvature"s).Value(bus_stat.curvature_)
+                        .Key("route_length"s).Value(bus_stat.route_length_)
+                        .Key("stop_count"s).Value(static_cast<int>(bus_stat.stops_count_))
+                        .Key("unique_stop_count"s).Value(static_cast<int>(bus_stat.unique_stops_count_));
             }
             else {
-                dict["error_message"] = json::Node("not found"s);
+                builder.Key("error_message"s).Value("not found"s);
             }
         }
         else if (flag == 'M') {
-            dict["map"] = json::Node(get<domain::Map>(stat));
+            builder.Key("map"s).Value(get<domain::Map>(variant_stat));
         }
-        arr.push_back(dict);
+        builder.EndDict();
     }
-    return json::Node(arr);
+    return builder.EndArray().Build();;
 }
 
  void json_input::PrintInfo(std::ostream& out, vector<tuple<char, int, domain::Stat>>& stat)
