@@ -7,17 +7,39 @@
 #include <unordered_set>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "geo.h"
+#include "graph.h"
 
 namespace domain {
 
-struct StopStat;
-struct BusStat;
-
 using Map = std::string;
 
-using Stat = std::variant<std::monostate, StopStat, BusStat, Map>;
+namespace route {
+
+struct Bus
+{
+	std::string_view name_;
+	size_t span_count_;
+	double time;
+};
+
+struct Wait
+{
+	std::string_view stop_name_;
+	size_t time_;
+};
+
+using RoutesItem = std::variant<Bus, Wait>;
+
+struct Route
+{
+	double total_time_;
+	std::vector<RoutesItem> items_;
+};
+
+} // route
 
 using MaxMinLatLon = std::pair<std::pair<double, double>,
 								std::pair<double, double>>;
@@ -64,6 +86,7 @@ struct StopStat
 	bool existing_ = false;
 	std::string_view name_{};
 	std::set<Bus*, BusCmp> busses_{};
+	size_t id_ = 0;
 };
 
 struct BusStat
@@ -78,9 +101,42 @@ struct BusStat
 
 struct PairBusHasher {
 	size_t operator()(const std::pair<Stop*, Stop*>& busses) const;
-	std::hash<std::string_view> string_haser1;
-	std::hash<std::string_view> string_haser2;
+	std::hash<const void*> haser;
 };
 
 double Dist(std::pair<double, double> lati_long_from, std::pair<double, double> lati_long_to);
-}
+
+struct RouteSettings {
+	size_t wait_time;
+	double bus_velocity;
+};
+
+namespace item{
+
+struct Wait {
+	std::string_view stop_name_;
+	int time_;
+};
+
+struct Bus {
+	std::string_view bus_name_;
+	int span_count_;
+	double time_;
+};
+
+} // item
+
+struct Route {
+	double total_time = 0;
+	std::deque<std::variant<item::Bus, item::Wait>> items;
+};
+
+using Stat = std::variant<std::monostate, const StopStat*, const BusStat*, Map, Route>;
+
+struct StatForGraph
+{
+	size_t stops_count_ = 0;
+	std::deque<graph::Edge<double>> short_edges_;
+};
+
+} // domain

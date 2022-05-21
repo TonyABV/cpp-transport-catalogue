@@ -341,9 +341,9 @@ Document Load(istream& input) {
     return Document{LoadNode(input)};
 }
 
-void Print(const Document& doc, std::ostream& output) {
-    const Node& node = doc.GetRoot();
-    (std::visit(PrintNodeConverter{ output }, node.GetValue()));
+void Print(const Node& doc, std::ostream& output) {
+    PrintNodeConverter converter{ output };
+        (std::visit(converter, doc.GetValue()));
 }
 
 bool operator==(const Node& lhs, const Node& rhs)
@@ -402,38 +402,38 @@ std::ostream& PrintNodeConverter::operator()(std::nullptr_t) const {
     return out_;
 }
 
-std::ostream& PrintNodeConverter::operator()(Array array) const
+std::ostream& PrintNodeConverter::operator()(const Array& array) const
 {
     out_ << "[";
 
     bool is_first = true;
     for (const auto& node : array) {
         if(is_first){
-            std::visit(PrintNodeConverter{ out_ }, node.GetValue());
+            std::visit(*this, node.GetValue());
             is_first = false;
             continue;
         }
         out_ << ", ";
-        std::visit(PrintNodeConverter{ out_ }, node.GetValue());
+        std::visit(*this, node.GetValue());
     }
     out_ << "]";
     return out_;
 }
 
-std::ostream& PrintNodeConverter::operator()(Dict dict) const
+std::ostream& PrintNodeConverter::operator()(const Dict& dict) const
 {
     out_ << "{ ";
     bool is_first = true;
     for (const auto& key_node : dict) {
         if (is_first) {
             out_ << "\"" << key_node.first << "\": ";
-            std::visit(PrintNodeConverter{ out_ }, key_node.second.GetValue());
+            std::visit(*this, key_node.second.GetValue());
             is_first = false;
             continue;
         }
         out_ << ", ";
         out_ << "\"" << key_node.first << "\": ";
-        std::visit(PrintNodeConverter{ out_ }, key_node.second.GetValue());
+        std::visit(*this, key_node.second.GetValue());
     }
     out_ << "}";
     return out_;
@@ -457,7 +457,7 @@ std::ostream& PrintNodeConverter::operator()(double d_num) const
     return out_;
 }
 
-std::ostream& PrintNodeConverter::operator()(std::string text) const
+std::ostream& PrintNodeConverter::operator()(const std::string& text) const
 {
 
     out_ << "\"";

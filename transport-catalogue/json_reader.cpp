@@ -57,18 +57,25 @@ tuple<deque<domain::Stop>, deque<domain::Distance>, deque<request::RawBus>>
     return make_tuple(new_stops, new_distances, new_busses);
 }
 
-deque<StatRequests> json_input::MakeStatReq(vector<json::Node>& stat_req)
+deque<StatRequest> json_input::MakeStatReq(vector<json::Node>& stat_req)
 {
-    deque<StatRequests> result;
+    deque<StatRequest> result;
     for (json::Node& req : stat_req) {
         string type = req.AsMap().at("type").AsString();
         int id = req.AsMap().at("id").AsInt();
-        if (type != "Map") {
+
+        if (type == "Route") {
+            string from = req.AsMap().at("from").AsString();
+            string to = req.AsMap().at("to").AsString();
+            result.push_back(request::type::Route{type, id, from, to});
+        } 
+        else if (type != "Map") {
             string name = req.AsMap().at("name").AsString();
-            result.push_back(make_tuple(type, id, name));
+
+            result.push_back(request::type::BusOrStop{ type, id, name });
         }
         else {
-            result.push_back(make_tuple(type, id, ""));
+            result.push_back(request::type::Map{ type, id });
         }
     }
     return result;
@@ -82,57 +89,101 @@ request::Requests json_input::MakeRequests(std::istream& input)
 
     auto base_req = MakeBaseReq(array_base_req);
     auto stat_req = MakeStatReq(array_stat_req);
-    return make_tuple(base_req, stat_req, node.AsMap().at("render_settings"));
+
+    std::optional<RenderSetings> rend_set;
+    std::optional<RoutingSettings> route_set;
+
+    auto set_iter = node.AsMap().find("render_settings");
+    if (set_iter != node.AsMap().end()) {
+        rend_set = (*set_iter).second;
+    }
+
+    set_iter = node.AsMap().find("routing_settings");
+    if (set_iter != node.AsMap().end()) {
+        route_set = (*set_iter).second;
+    }
+
+    return make_tuple(base_req, stat_req, rend_set, route_set);
 }
 
 json::Node json_input::AdaptToJson(std::vector<std::tuple<char, int, domain::Stat>>& statistics)
 {
     json::Builder builder{};
-    builder.StartArray();
+    builder.StartArray(statistics.size());
     for (const auto& stat : statistics) {
-        builder.StartDict().Key("request_id"s).Value(get<1>(stat));
+        builder.StartDict().Key(move("request_id"s)).Value(get<1>(stat));
 
         char flag = get<0>(stat);
         domain::Stat variant_stat = get<2>(stat);
 
         if (flag == 'S') {
-            domain::StopStat stop_stat = get<domain::StopStat>(variant_stat);
-            if (stop_stat.existing_) {
+            const domain::StopStat* stop_stat = get<const domain::StopStat*>(variant_stat);
+            if (stop_stat != nullptr) {
 
-                builder.Key("buses"s).StartArray();
-                for (domain::Bus* bus : stop_stat.busses_) {
+                builder.Key(move("buses"s)).StartArray(stop_stat->busses_.size());
+                for (domain::Bus* bus : stop_stat->busses_) {
                     builder.Value(bus->name_);
                 }
                 builder.EndArray();
             }
             else {
-                builder.Key("error_message"s).Value("not found"s);
+                builder.Key(move("error_message"s)).Value("not found"s);
             }
         }
         else if(flag == 'B') {
-            domain::BusStat bus_stat = get<domain::BusStat>(variant_stat);
-            if (bus_stat.existing_) {
-                 builder.Key("curvature"s).Value(bus_stat.curvature_)
-                        .Key("route_length"s).Value(bus_stat.route_length_)
-                        .Key("stop_count"s).Value(static_cast<int>(bus_stat.stops_count_))
-                        .Key("unique_stop_count"s).Value(static_cast<int>(bus_stat.unique_stops_count_));
+            const domain::BusStat* bus_stat = get<const domain::BusStat*>(variant_stat);
+            if (bus_stat != nullptr) {
+                 builder.Key(move("curvature"s)).Value(bus_stat->curvature_)
+                        .Key(move("route_length"s)).Value(bus_stat->route_length_)
+                        .Key(move("stop_count"s)).Value(static_cast<int>(bus_stat->stops_count_))
+                        .Key(move("unique_stop_count"s)).Value(static_cast<int>(bus_stat->unique_stops_count_));
             }
             else {
-                builder.Key("error_message"s).Value("not found"s);
+                builder.Key(move("error_message"s)).Value("not found"s);
             }
         }
         else if (flag == 'M') {
-            builder.Key("map"s).Value(get<domain::Map>(variant_stat));
+            builder.Key(move("map"s)).Value(get<domain::Map>(variant_stat));
+        }
+        else if (flag == 'R') {
+            if (holds_alternative<monostate>(variant_stat)) {
+                builder.Key(move("error_message"s)).Value("not found"s);
+            }
+            else {
+                domain::Route route_stat = get<domain::Route>(variant_stat);
+                builder.Key(move("total_time"s)).Value(route_stat.total_time)
+                    .Key(move("items"s)).StartArray(route_stat.items.size());
+                for (auto& item : route_stat.items) {
+                    if (holds_alternative<domain::item::Bus>(item)) {
+                        auto& bus = get<domain::item::Bus>(item);
+                        builder.StartDict()
+                            .Key(move("type"s)).Value("Bus"s)
+                            .Key(move("bus"s)).Value(string(bus.bus_name_))
+                            .Key(move("span_count"s)).Value(bus.span_count_)
+                            .Key(move("time"s)).Value(bus.time_)
+                            .EndDict();
+                    }
+                    else {
+                        auto& wait = get<domain::item::Wait>(item);
+                        builder.StartDict()
+                            .Key(move("type"s)).Value("Wait"s)
+                            .Key(move("stop_name"s)).Value(string(wait.stop_name_))
+                            .Key(move("time"s)).Value(wait.time_)
+                            .EndDict();
+                    }
+                }
+                builder.EndArray();
+            }
         }
         builder.EndDict();
     }
-    return builder.EndArray().Build();;
+    return move(builder.EndArray().Build());
 }
 
  void json_input::PrintInfo(std::ostream& out, vector<tuple<char, int, domain::Stat>>& stat)
  {
      json::Node node = AdaptToJson(stat);
-     json::Print(json::Document(node), out);
+     json::Print(node, out);
  }
 
  string ColorConvert(vector<json::Node> color) {
@@ -151,7 +202,7 @@ json::Node json_input::AdaptToJson(std::vector<std::tuple<char, int, domain::Sta
      }
  }
 
- renderer::RenderSettings json_input::GetSettings(const json::Dict& render_set)
+ renderer::RenderSettings json_input::GetRenderSettings(const json::Dict& render_set)
  {
      renderer::RenderSettings result;
      
@@ -189,5 +240,24 @@ json::Node json_input::AdaptToJson(std::vector<std::tuple<char, int, domain::Sta
          }
      }
 
+     return result;
+ }
+
+ domain::RouteSettings json_input::GetRouteSettings(const json::Dict& node)
+ {
+
+     domain::RouteSettings result;
+
+     result.bus_velocity = node.at("bus_velocity").AsDouble() * 1000 / 60; // m/min
+     result.wait_time = node.at("bus_wait_time").AsInt();
+
+     return result;
+ }
+
+ domain::RouteSettings GetRouteSettings(const json::Dict& node)
+ {
+     domain::RouteSettings result;
+     result.bus_velocity = ((*node.find("bus_velocity"s)).second.AsInt());
+     result.wait_time = ((*node.find("bus_wait_time"s)).second.AsInt());
      return result;
  }

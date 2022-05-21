@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cmath>
+//#include <deque>
 #include <execution>
 #include <iomanip>
 #include <iostream>
 #include <map>
+//#include <unordered_map>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -19,6 +21,7 @@ class Node;
 class Document;
 using Dict = std::map<std::string, Node>;
 using Array = std::vector<Node>;
+//using Deq = std::deque<Node>;
 
 // Эта ошибка должна выбрасываться при ошибках парсинга JSON
 class ParsingError : public std::runtime_error {
@@ -66,7 +69,7 @@ private:
 
 Document Load(std::istream& input);
 
-void Print(const Document& doc, std::ostream& output);
+void Print(const Node& doc, std::ostream& output);
 
 bool operator==(const Node& lhs, const Node& rhs);
 bool operator!=(const Node& lhs, const Node& rhs);
@@ -76,12 +79,12 @@ struct PrintNodeConverter
     PrintNodeConverter(std::ostream& out) :out_(out) {}
 
     std::ostream& operator()(std::nullptr_t) const;
-    std::ostream& operator()(Array array) const;
-    std::ostream& operator()(Dict dict) const;
+    std::ostream& operator()(const Array& array) const;
+    std::ostream& operator()(const Dict& dict) const;
     std::ostream& operator()(bool boo)const;
     std::ostream& operator()(int num) const;
     std::ostream& operator()(double num) const;
-    std::ostream& operator()(std::string text)const;
+    std::ostream& operator()(const std::string& text)const;
 
 private:
     std::ostream& out_;

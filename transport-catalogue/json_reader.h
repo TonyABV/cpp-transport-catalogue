@@ -3,6 +3,7 @@
 #include <deque>
 #include <iostream>
 #include <map>
+#include <unordered_map>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -24,13 +25,15 @@ request::RawBus AdaptBusReq(const std::map < std::string, json::Node>& bus_req);
 std::tuple<std::deque<domain::Stop>, std::deque<domain::Distance>, std::deque<request::RawBus>>
 	MakeBaseReq(std::vector<json::Node>& base_req);
 
-std::deque<request::StatRequests> MakeStatReq(std::vector<json::Node>& stat_req);
+std::deque<request::StatRequest> MakeStatReq(std::vector<json::Node>& stat_req);
 
 request::Requests MakeRequests(std::istream& input);
 
 json::Node AdaptToJson(std::vector<std::tuple<char, int, domain::Stat>>& stats);
 void PrintInfo(std::ostream& out, std::vector<std::tuple<char, int, domain::Stat>>& stat);
 
-renderer::RenderSettings GetSettings(const json::Dict& render_set);
+renderer::RenderSettings GetRenderSettings(const json::Dict& render_set);
+
+domain::RouteSettings GetRouteSettings(const json::Dict& node);
 
 }

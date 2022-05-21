@@ -14,6 +14,6 @@ size_t domain::BusHasher::operator()(const Bus* bus) const
 	return string_haser(bus->name_);
 }
 
-size_t domain::PairBusHasher::operator()(const std::pair<Stop*, Stop*>&busses) const {
-	return string_haser1(busses.first->name_) + 42 * string_haser2(busses.second->name_);
+size_t domain::PairBusHasher::operator()(const std::pair<Stop*, Stop*>& busses) const {
+	return haser(busses.first) + 42 * haser(busses.second);
 }

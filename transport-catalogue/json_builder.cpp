@@ -6,7 +6,7 @@ json::Builder::Builder()
 {
 }
 
-Node Builder::Build()
+const Node& Builder::Build()
 {
     if (!root_.has_value()) {
         throw std::logic_error("root_ is empty");
@@ -42,10 +42,13 @@ BaseContext Builder::Value(Node value)
     }
 }
 
-ArrayItemContext Builder::StartArray()
+ArrayItemContext Builder::StartArray(size_t cap = 0)
 {
+    Array empty_array;
+    empty_array.reserve(cap);
+
     if (!root_.has_value()) {
-        root_ = Array{};
+        root_ = move(empty_array);
         nodes_stack_.push_back(&root_.value());
         return *this;
     }
@@ -57,12 +60,11 @@ ArrayItemContext Builder::StartArray()
     }
     else if (nodes_stack_.back()->IsArray()) {
         Array& arr = std::get<Array>(nodes_stack_.back()->GetValue());
-        arr.push_back(Node(Array{}));
+        arr.push_back(move(empty_array));
         nodes_stack_.push_back(&arr.back());
         return *this;
     }
-
-    nodes_stack_.back()->GetValue() = Array{};
+    nodes_stack_.back()->GetValue() = move(empty_array);
     return *this;
 }
 
@@ -93,7 +95,7 @@ DictItemContext Builder::StartDict()
     }
     else if (nodes_stack_.back()->IsArray()) {
         Array& array = std::get<Array>(nodes_stack_.back()->GetValue());
-        (array).push_back(Dict{});
+        array.push_back(Dict{});
         nodes_stack_.push_back(&array.back());
         return *this;
     }
@@ -102,7 +104,7 @@ DictItemContext Builder::StartDict()
     return *this;
 }
 
-BaseContext Builder::Key(std::string key)
+BaseContext Builder::Key(std::string&& key)
 {
     if (nodes_stack_.empty()) {
         throw std::logic_error("Stack is empty");
@@ -112,7 +114,7 @@ BaseContext Builder::Key(std::string key)
     }
     Dict& dict = std::get<Dict>(nodes_stack_.back()->GetValue());
     dict.insert({ key, Node{} });
-    nodes_stack_.push_back(&(dict.at(key)));
+    nodes_stack_.push_back(&(dict.at(move(key))));
     return *this;
 }
 
@@ -137,9 +139,9 @@ BaseContext BaseContext::Value(json::Node value)
     return builder_.Value(value);
 }
 
-BaseContext BaseContext::StartArray()
+BaseContext BaseContext::StartArray(size_t cap)
 {
-    return builder_.StartArray();
+    return builder_.StartArray(cap);
 }
 
 BaseContext BaseContext::EndArray()
@@ -153,9 +155,9 @@ DictItemContext BaseContext::StartDict()
     return static_cast<DictItemContext&>(context);
 }
 
-KeyItemContext BaseContext::Key(std::string key)
+KeyItemContext BaseContext::Key(std::string&& key)
 {
-    BaseContext context = builder_.Key(key);
+    BaseContext context = builder_.Key(move(key));
     return static_cast<KeyItemContext>(context);
 }
 
@@ -169,7 +171,7 @@ BaseContext BaseContext::EndDict()
     return builder_.EndDict();
 }
 
-Node json::BaseContext::Build()
+const Node& json::BaseContext::Build()
 {
     return builder_.Build();
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "json.h"
@@ -17,15 +18,15 @@ class Builder
 public:
     Builder();
 
-    Node Build();
+    const Node& Build();
 
     BaseContext Value(Node value);
 
-    ArrayItemContext StartArray();
+    ArrayItemContext StartArray(size_t cap);
     BaseContext EndArray();
 
     DictItemContext StartDict();
-    BaseContext Key(std::string key);
+    BaseContext Key(std::string&& key);
     BaseContext EndDict();
 
     ~Builder();
@@ -38,15 +39,15 @@ class BaseContext {
 public:
     BaseContext(Builder& builder);
 
-    Node Build();
+    const Node& Build();
 
     BaseContext Value(Node value);
 
-    BaseContext StartArray();
+    BaseContext StartArray(size_t cap = 0);
     BaseContext EndArray();
 
     DictItemContext StartDict();
-    KeyItemContext Key(std::string key);
+    KeyItemContext Key(std::string&& key);
     BaseContext EndDict();
 
     Builder& GetBuilder();
