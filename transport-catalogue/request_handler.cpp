@@ -4,9 +4,8 @@ using namespace std;
 using namespace request;
 
 RequestHandler::RequestHandler(TransportCatalogue& db, const renderer::MapRenderer& renderer,
-								const domain::RouteSettings& route_set, const graph::DirectedWeightedGraph<double>& graph,
-								const graph::Router<double>& router)
-	: db_(db), renderer_(renderer), route_set_(route_set), graph_(graph), router_(router){}
+								const domain::RouteSettings& route_set, const TransportRouter& router)
+	: db_(db), renderer_(renderer), route_set_(route_set), router_(router){}
 
 tuple<char, int, domain::Stat> RequestProcessor::operator()(request::type::BusOrStop stat_req)
 {
@@ -59,7 +58,37 @@ domain::Map RequestHandler::GetMap()
 	return RequestHandler::renderer_.CreateMap(busses);
 }
 
-optional<domain::Route> RequestHandler::GetRoute(std::string from, std::string to)
+domain::Route RequestHandler::ConvertToItems(const std::optional<graph::Router<double>::RouteInfo>& route,
+																						std::string_view from)
+{
+	domain::Route result;
+
+	result.total_time = route.value().weight;
+
+	auto* stop = db_.FindStop(from);
+
+	result.items.push_back(domain::item::Wait{ stop->name_, int(route_set_.wait_time) });
+
+	const auto& graph = router_.GetGraph();
+
+	const auto& eges = route.value().edges;
+	for (size_t n = 0; n < eges.size(); ++n) {
+		const auto& edge = graph.GetEdge(eges[n]);
+		if (n == eges.size() - 1) {
+			result.items.push_back(domain::item::Bus{ edge.bus_name, int(edge.span_count),
+				edge.weight - route_set_.wait_time });
+			break;
+		}
+		result.items.push_back(domain::item::Bus{ edge.bus_name, int(edge.span_count), edge.weight - route_set_.wait_time });
+
+		stop = db_.FindStop(edge.to);
+		result.items.push_back(domain::item::Wait{ stop->name_, int(route_set_.wait_time) });
+	}
+
+	return result;
+}
+
+optional<domain::Route> RequestHandler::GetRoute(std::string_view from, std::string_view to)
 {
 	const domain::StopStat* f_stop_stat = db_.GetStopStat(from);
 	const domain::StopStat* t_stop_stat = db_.GetStopStat(to);
@@ -73,26 +102,7 @@ optional<domain::Route> RequestHandler::GetRoute(std::string from, std::string t
 		return domain::Route();
 	}
 
-	domain::Route result;
-	result.total_time = route.value().weight;
-
-	auto* stop = db_.FindStop(from);
-
-	result.items.push_back(domain::item::Wait{ stop->name_, int(route_set_.wait_time) });
-
-	const auto& eges = route.value().edges;
-	for (size_t n = 0; n < eges.size(); ++n) {
-		const auto& edge = graph_.GetEdge(eges[n]);
-		if (n == eges.size() - 1) {
-			result.items.push_back(domain::item::Bus{ edge.bus_name, int(edge.span_count),
-													edge.weight - route_set_.wait_time });
-			break;
-		}
-		result.items.push_back(domain::item::Bus{ edge.bus_name, int(edge.span_count), edge.weight - route_set_.wait_time });
-
-		stop = db_.FindStop(edge.to);
-		result.items.push_back(domain::item::Wait{ stop->name_, int(route_set_.wait_time) });
-	}
+	domain::Route result(ConvertToItems(route, from));	
 
 	return result;
 }
