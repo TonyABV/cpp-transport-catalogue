@@ -2,6 +2,7 @@
 #include <deque>
 #include <map>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -10,12 +11,7 @@
 #include "json.h"
 #include "map_renderer.h"
 #include "transport_catalogue.h"
-#include "router.h"
-
-
-// Класс RequestHandler играет роль Фасада, упрощающего взаимодействие JSON reader-а
-// с другими подсистемами приложения.
-// См. паттерн проектирования Фасад: https://ru.wikipedia.org/wiki/Фасад_(шаблон_проектирования)
+#include "transport_router.h"
 
 namespace request {
     struct RawBus {
@@ -32,7 +28,6 @@ namespace request {
     }
 
     using StatRequest = std::variant<type::BusOrStop, type::Map, type::Route>;
-    //using StatRequests = std::tuple<std::string, int, std::string >;
 
     using BaseRequests = std::tuple< std::deque<domain::Stop>, std::deque<domain::Distance>,
         std::deque<RawBus>>;
@@ -42,29 +37,29 @@ namespace request {
     using RoutingSettings = json::Node;
 
     using Requests = std::tuple<BaseRequests, std::deque<StatRequest>, std::optional<RenderSetings>,
-                                std::optional<RoutingSettings>>;
+                                                                    std::optional<RoutingSettings>>;
 }
 
 class RequestHandler {
 public:
     RequestHandler(TransportCatalogue& db, const renderer::MapRenderer& renderer,
-                    const domain::RouteSettings& route_set, const graph::DirectedWeightedGraph<double>& graph,
-                    const graph::Router<double>& router);
+                    const domain::RouteSettings& route_set, const TransportRouter& router);
 
     std::vector<std::tuple<char, int, domain::Stat>> GetStatistics(std::deque<request::StatRequest>& requests);
 
     const domain::BusStat* GetBusStat(const std::string& bus_name) const;
     const domain::StopStat* GetStopStat(const std::string& stop_name) const;
     domain::Map GetMap();
-    std::optional<domain::Route> GetRoute(std::string from, std::string to);
-
+    std::optional<domain::Route> GetRoute(std::string_view from, std::string_view to);
     
 private:
+    domain::Route ConvertToItems(const std::optional<graph::Router<double>::RouteInfo>& route,
+                                                                                         std::string_view from);
+
     const TransportCatalogue& db_;
     const renderer::MapRenderer& renderer_;
     const domain::RouteSettings& route_set_;
-    const graph::DirectedWeightedGraph<double>& graph_;
-    const graph::Router<double>& router_;
+    const TransportRouter& router_;
 };
 
 struct RequestProcessor: public RequestHandler {

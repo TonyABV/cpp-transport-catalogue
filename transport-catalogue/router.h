@@ -74,9 +74,11 @@ private:
             }
         }
     }
-
+private:
     static constexpr Weight ZERO_WEIGHT{};
+protected:
     const Graph& graph_;
+private:
     RoutesInternalData routes_internal_data_;
 };
 
