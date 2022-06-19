@@ -1,94 +1,65 @@
 #pragma once
 
-#include <cmath>
-//#include <deque>
-#include <execution>
-#include <iomanip>
 #include <iostream>
-#include <map>
-//#include <unordered_map>
-#include <set>
-#include <sstream>
 #include <stdexcept>
-#include <string>
-#include <utility>
 #include <variant>
+#include <string>
 #include <vector>
+#include <map>
+#include <unordered_map>
 
 namespace json {
+    // Эта ошибка должна выбрасываться при ошибках парсинга JSON
+    class ParsingError : public std::runtime_error {
+    public:
+        using runtime_error::runtime_error;
+    };
 
-class Node;
-class Document;
-using Dict = std::map<std::string, Node>;
-using Array = std::vector<Node>;
-//using Deq = std::deque<Node>;
+    class Node;
+    using Dict = std::map<std::string, Node>;
+    using Array = std::vector<Node>;
+    class Node final
+        : private std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string> {
+    public:
+        using variant::variant; //Наследование и полиморфизм. Другие виды наследования: делаем доступными все конструкторы родительского класса variant
+        using Value = variant;
+    public:
 
-// Эта ошибка должна выбрасываться при ошибках парсинга JSON
-class ParsingError : public std::runtime_error {
-public:
-    using runtime_error::runtime_error;
-};
+        int AsInt() const;
+        double AsDouble() const;
+        bool AsBool() const;
+        const std::string& AsString() const;
+        const Array& AsArray() const;
+        const Dict& AsDict() const;
+        const Dict& AsMap() const;
 
-class Node final
-    :private std::variant<std::nullptr_t, Array, Dict, bool, int, double, std::string>
-{
-public:
-    using variant::variant;
-    using Value = variant;
+        bool IsInt() const;
+        bool IsPureDouble() const;
+        bool IsDouble() const;
+        bool IsBool() const;
+        bool IsString() const;
+        bool IsArray() const;
+        bool IsDict() const;
+        bool IsMap() const;
+        bool IsNull() const;
 
-    //const VarNode& TakeVar()const;
-    const Value& GetValue() const;
-    Value& GetValue();
+        Value& GetValue();
+        const Value& GetValue() const;
+    };
+    bool operator==(const Node& lhs, const Node& rhs);
+    bool operator!=(const Node& lhs, const Node& rhs);
 
-    const Array& AsArray() const;
-    const Dict& AsMap() const;
-    const bool& AsBool() const;
-    int AsInt() const;
-    double AsDouble() const;
-    const std::string& AsString() const;
+    class Document {
+    public:
+        Document() = default;
+        explicit Document(Node root);
+        const Node& GetRoot() const;
+    private:
+        Node root_;
+    };
+    bool operator== (const Document& lhs, const Document& rhs);
+    bool operator!= (const Document& lhs, const Document& rhs);
 
-    bool IsNull() const;
-    bool IsArray()const;
-    bool IsDict() const;
-    bool IsBool() const;
-    bool IsInt() const;
-    bool IsDouble() const;
-    bool IsPureDouble() const;
-    bool IsString() const;
-};
-
-class Document {
-public:
-    explicit Document(Node root);
-
-    const Node& GetRoot() const;
-
-private:
-    Node root_;
-};
-
-Document Load(std::istream& input);
-
-void Print(const Node& doc, std::ostream& output);
-
-bool operator==(const Node& lhs, const Node& rhs);
-bool operator!=(const Node& lhs, const Node& rhs);
-
-struct PrintNodeConverter
-{
-    PrintNodeConverter(std::ostream& out) :out_(out) {}
-
-    std::ostream& operator()(std::nullptr_t) const;
-    std::ostream& operator()(const Array& array) const;
-    std::ostream& operator()(const Dict& dict) const;
-    std::ostream& operator()(bool boo)const;
-    std::ostream& operator()(int num) const;
-    std::ostream& operator()(double num) const;
-    std::ostream& operator()(const std::string& text)const;
-
-private:
-    std::ostream& out_;
-    std::map<char, char> escape_seq_{ {'\r', 'r'}, {'\n', 'n'}, {'\"', '\"'}, {'\\', '\\'} };
-};
-
-}  // namespace json
+    Document Load(std::istream& input);
+    void Print(const Document& doc, std::ostream& output);
+}// namespace json

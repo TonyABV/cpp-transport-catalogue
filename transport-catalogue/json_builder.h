@@ -1,107 +1,84 @@
 #pragma once
-#include <optional>
-#include <utility>
-#include <vector>
 
 #include "json.h"
 
+#include <memory>
+#include <stdexcept>
+#include <utility>
+#include <variant>
+#include <optional>
+#include <string>
+#include <vector>
+
 namespace json {
+    enum class Step {
+        BUILD,
+        ARR,
+        DICT
+    };
 
-class BaseContext;
-class DictItemContext;
-class KeyItemContext;
-class ItemAfterKeyContext;
-class ArrayItemContext;
+    class DictItemContext;
+    class DictValueContext;
+    class ArrayContext;
 
-class Builder
-{
-public:
-    Builder();
+    class Builder {
+    public:
+        Builder();
 
-    const Node& Build();
+        DictItemContext StartDict();
 
-    BaseContext Value(Node value);
+        Builder& EndDict();
 
-    ArrayItemContext StartArray(size_t cap);
-    BaseContext EndArray();
+        ArrayContext StartArray();
 
-    DictItemContext StartDict();
-    BaseContext Key(std::string&& key);
-    BaseContext EndDict();
+        Builder& EndArray();
 
-    ~Builder();
-private:
-    std::optional<Node> root_;
-    std::vector<Node*> nodes_stack_{};
-};
+        DictValueContext Key(const std::string& key);
 
-class BaseContext {
-public:
-    BaseContext(Builder& builder);
+        Builder& Value(const Node::Value& val);
 
-    const Node& Build();
+        Node Build() const;
 
-    BaseContext Value(Node value);
+        void AddNode(Node&& node);
 
-    BaseContext StartArray(size_t cap = 0);
-    BaseContext EndArray();
+    private:
 
-    DictItemContext StartDict();
-    KeyItemContext Key(std::string&& key);
-    BaseContext EndDict();
+        std::optional<Node> root_;
+        std::vector<Step> step_stack_;
+        std::vector< std::optional<std::string> > keys_;
+        int dicts_open_ = 0;
+        int arrays_open_ = 0;
+        std::vector<std::vector<Node>> all_arrays_;
+        std::vector< std::vector<std::pair<std::string, Node>> > all_dicts_;
+    };
 
-    Builder& GetBuilder();
+    class DictItemContext {
+    public:
+        DictItemContext(Builder& builder);
+        DictValueContext Key(const std::string& key);
+        Builder& EndDict();
+    private:
+        Builder& builder_;
+    };
 
-    ~BaseContext() = default;
-private:
-    Builder& builder_;
-};
+    class DictValueContext {
+    public:
+        DictValueContext(Builder& builder);
+        DictItemContext Value(const Node::Value& val);
+        DictItemContext StartDict();
+        ArrayContext StartArray();
+    private:
+        Builder& builder_;
+    };
 
-class DictItemContext : public BaseContext {
-public:
-    DictItemContext(Builder& builder);
-    DictItemContext(BaseContext& context);
-
-    Node Build() = delete;
-    BaseContext Value() = delete;
-    BaseContext StartArray() = delete;
-    BaseContext EndArray() = delete;
-    BaseContext StartDict() = delete;
-};
-
-class KeyItemContext : public BaseContext {
-public:
-    KeyItemContext(BaseContext& context);
-
-    ItemAfterKeyContext Value(Node value);
-
-    Node Build() = delete;
-    BaseContext EndArray() = delete;
-    BaseContext Key() = delete;
-    BaseContext EndDict() = delete;
-};
-
-class ItemAfterKeyContext : public BaseContext {
-public:
-    ItemAfterKeyContext(BaseContext& context);
-
-    Node Build() = delete;
-    BaseContext Value(Node value) = delete;
-    BaseContext StartArray() = delete;
-    BaseContext EndArray() = delete;
-    DictItemContext StartDict() = delete;
-};
-
-class ArrayItemContext :public BaseContext {
-public:
-    ArrayItemContext(Builder& builder);
-    ArrayItemContext(BaseContext& context);
-
-    ArrayItemContext Value(Node value);
-
-    Node Build() = delete;
-    KeyItemContext Key(std::string key) = delete;
-    BaseContext EndDict() = delete;
-};
-
-}// json
+    class ArrayContext {
+    public:
+        ArrayContext(Builder& builder);
+        ArrayContext Value(const Node::Value& val);
+        DictItemContext StartDict();
+        ArrayContext StartArray();
+        Builder& EndArray();
+    private:
+        Builder& builder_;
+    };
+} // json

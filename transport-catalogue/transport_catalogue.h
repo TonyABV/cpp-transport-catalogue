@@ -1,67 +1,78 @@
 #pragma once
 
-#include <deque>
-#include <execution>
-#include <set>
-#include <string>
-#include <tuple>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-
 #include "domain.h"
-#include "graph.h"
 
-class TransportCatalogue{
-public:
-	void AddStop(domain::Stop&& new_stop);
-	void SetDist(domain::Distance&& dist);
-	void AddBus(domain::Bus&& new_bus);
+#include <unordered_set>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <string_view>
+#include <deque>
+#include <cassert>
+#include <iostream>
+#include <set>
 
-	domain::Bus* FindBus(std::string_view bus_name) const;
-	domain::Stop* FindStop(std::string_view stop_name) const;
-	domain::Stop* FindStop(size_t stop_id)const;
+namespace transport_db {
+	struct SvSvHasher {
+		size_t operator()(const std::pair<std::string_view, std::string_view>& stop_to_stop) const;
+		std::hash<std::string_view> sv_hasher;
+	};
 
-	const std::deque<domain::Bus>& GetBuses() const;
+	class TransportCatalogue {
+	public:
+		TransportCatalogue() {};
 
-	const domain::BusStat* GetBusStat(std::string_view bus_name) const;
-	const domain::StopStat* GetStopStat(std::string_view stop_name) const;
+		void AddRoute(std::string name, const std::vector<std::string_view>& data, bool is_round, std::string_view end_stop);
+		const domain::Bus* SearchRoute(std::string_view name) const;
 
-	std::deque<const domain::Bus*> GetNonemptyBusses() const;
-	std::deque<const domain::BusStat*> GetNonemptyBussesStat() const;
+		struct RouteOutput {
+			std::string name = {}; 
+			size_t real_stops_count = {};
+			size_t unique_stops_count = {};
+			double route_length = {};
+			double curvature = {};
+		};
+
+		RouteOutput GetRoute(std::string_view name);
+
+		void AddStop(std::string name, const geo::Coordinates& coordinates);
+		const domain::Stop* SearchStop(std::string_view name) const;
+
+		struct StopOutput {
+			std::string name = {};
+			std::set<std::string_view> buses = {};
+		};
+
+		StopOutput GetStop(std::string_view name);
+
+		void SetDistBtwStops(std::string_view name, std::string_view name_to, const int dist);
+		int GetDistBtwStops(std::string_view name, std::string_view name_to);
 
 
-	domain::StatForGraph& GetGraphStat();
+		using RoutesMap = std::unordered_map<std::string_view, domain::Bus>;
+		const RoutesMap& GetRoutesForRender() const {
+			return routes_;
+		}
 
-	size_t GetStopCount();
+		using StopsMap = std::unordered_map<std::string_view, domain::Stop>;
+		const StopsMap& GetStopsForRender() const {
+			return stops_;
+		}
 
-	int GetDist(const std::pair<domain::Stop*, domain::Stop*>& from_to);
-private:
-	void UpdateStopStat();
-	void UpdateBusStat();
-	
-	// Update stop stat, create edges,  return: route length, straight_dist.
-	std::pair<int, double> DoLoopByStops(domain::Bus& bus);
+		using DistMap = std::unordered_map<std::pair<std::string_view, std::string_view>, int, SvSvHasher>;
+		const DistMap& GetDistForRouter() const {
+			return dist_btw_stops_;
+		}
 
-	double ComputeStraightDist(const domain::Stop* from, const domain::Stop* to) const;
+		~TransportCatalogue() {};
 
-	std::deque<domain::Stop> stops_;
+	private:
+		std::deque<std::string> stops_names_; // уникальные остановки
+		std::deque<std::string> buses_names_; // уникальные автобусы
+		
+		std::unordered_map<std::pair<std::string_view, std::string_view>, int, SvSvHasher> dist_btw_stops_; // расстояния между остновками
 
-	size_t stop_id_counter = 0;
-	std::vector<domain::Stop*> id_to_stop_;
-	std::unordered_map<std::string_view, domain::Stop*> stopname_to_stop_;
-	std::unordered_map<std::string_view, domain::StopStat> stopname_to_stopstat_;
-
-	std::unordered_map < std::string_view, 
-		std::unordered_set < domain::Bus*, domain::BusHasher >> stopname_to_busses_;
-
-	std::deque<domain::Bus> busses_;
-
-	std::unordered_map<std::string_view, domain::Bus*> busname_to_bus_;
-	std::unordered_map <std::string_view, domain::BusStat> busname_to_busstat_;
-	std::unordered_map<std::pair<domain::Stop*, domain::Stop*>, int, domain::PairBusHasher> from_to_dist;
-
-	domain::StatForGraph graph_stat_;
-
-};
+		std::unordered_map<std::string_view, domain::Stop> stops_;
+		std::unordered_map<std::string_view, domain::Bus> routes_;
+	};
+}

@@ -1,69 +1,43 @@
 #pragma once
-#include <deque>
-#include <map>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <variant>
 
-#include "domain.h"
-#include "graph.h"
-#include "json.h"
-#include "map_renderer.h"
 #include "transport_catalogue.h"
+#include "map_renderer.h"
 #include "transport_router.h"
+#include "serialization.h"
 
-namespace request {
-    struct RawBus {
-        std::string name_;
-        bool route_is_circular_ = false;
-        std::deque<std::string> stops_{};
+#include <optional>
+#include <iostream>
+
+namespace transport_db {
+
+    class RequestHandler {
+    public:
+        explicit RequestHandler(const transport_db::TransportCatalogue& db, map_renderer::MapRenderer& renderer, transport_router::TransportRouter& router, serialization::Serialization& serialization)
+            :db_(db), renderer_(renderer), router_(router), serialization_(serialization) {
+        }
+
+        std::optional<const domain::Bus*> GetBusStat(std::string_view bus_name);
+
+        const std::set<std::string_view>* GetBusesByStop(const std::string_view& stop_name) const;
+
+        void RenderMap() const;
+
+        void SetCatalogueDataToRender() const;
+
+        void GenerateRouter() const;
+
+        void SerializeBase() const; 
+
+        void DeserializeBase() const; 
+
+    private:
+
+        const TransportCatalogue& db_;
+        map_renderer::MapRenderer& renderer_;
+        transport_router::TransportRouter& router_;
+        serialization::Serialization& serialization_; 
+
+        void SetStopsForRender() const;
+        void SetRoutesForRender() const;
     };
-
-    namespace type
-    {
-        using BusOrStop = std::tuple<std::string, int, std::string >;
-        using Map = std::tuple<std::string, int>;
-        using Route = std::tuple<std::string, int, std::string, std::string>;
-    }
-
-    using StatRequest = std::variant<type::BusOrStop, type::Map, type::Route>;
-
-    using BaseRequests = std::tuple< std::deque<domain::Stop>, std::deque<domain::Distance>,
-        std::deque<RawBus>>;
-
-    using RenderSetings = json::Node;
-
-    using RoutingSettings = json::Node;
-
-    using Requests = std::tuple<BaseRequests, std::deque<StatRequest>, std::optional<RenderSetings>,
-                                                                    std::optional<RoutingSettings>>;
-}
-
-class RequestHandler {
-public:
-    RequestHandler(TransportCatalogue& db, const renderer::MapRenderer& renderer,
-                    const domain::RouteSettings& route_set, const TransportRouter& router);
-
-    std::vector<std::tuple<char, int, domain::Stat>> GetStatistics(std::deque<request::StatRequest>& requests);
-
-    const domain::BusStat* GetBusStat(const std::string& bus_name) const;
-    const domain::StopStat* GetStopStat(const std::string& stop_name) const;
-    domain::Map GetMap();
-    std::optional<domain::Route> GetRoute(std::string_view from, std::string_view to);
-    
-private:
-    domain::Route ConvertToItems(const std::optional<graph::Router<double>::RouteInfo>& route,
-                                                                                         std::string_view from);
-
-    const TransportCatalogue& db_;
-    const renderer::MapRenderer& renderer_;
-    const domain::RouteSettings& route_set_;
-    const TransportRouter& router_;
-};
-
-struct RequestProcessor: public RequestHandler {
-    std::tuple<char, int, domain::Stat> operator()(request::type::BusOrStop stat_req);
-    std::tuple<char, int, domain::Stat> operator()(request::type::Map stat_req);
-    std::tuple<char, int, domain::Stat> operator()(request::type::Route);
-};
+} // namespace transport_db

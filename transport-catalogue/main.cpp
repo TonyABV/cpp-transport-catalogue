@@ -1,94 +1,68 @@
-#include <cassert>
-#include <fstream> 
-#include <iostream>
-#include <istream>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
-
-#include "domain.h"
-#include "graph.h"
 #include "json_reader.h"
-#include "map_renderer.h"
-#include "transport_catalogue.h"
-#include "transport_router.h"
+#include "serialization.h"
+
+#include <iostream>
+#include <fstream>
+#include <string_view>
 
 using namespace std;
-using namespace domain;
 
-domain::Bus PrepareNewBus(const TransportCatalogue& tc, request::RawBus& raw_bus);
+void CreateAndSerializeBase() {
+    transport_db::TransportCatalogue catalog;
+    map_renderer::MapRenderer renderer;
+    transport_router::TransportRouter router(catalog);
+    serialization::Serialization serialization(catalog, renderer, router);
+    json_reader::JsonReader json(catalog, renderer, router, serialization);
 
-void InfillCatalog(TransportCatalogue& tc, request::BaseRequests& req);
+    transport_db::RequestHandler request_handler(catalog, renderer, router, serialization);
 
-graph::DirectedWeightedGraph<double> BuildGraph(TransportCatalogue& tc, const domain::RouteSettings& settings);
 
-int main() {
-	/*ifstream input("input.json");
-	ofstream output("output.json");*/
+   ifstream input("make_base.json");
 
-	request::Requests requests = json_input::MakeRequests(cin);
-
-	TransportCatalogue tc;
-
-	InfillCatalog(tc, get<0>(requests));
-
-	renderer::RenderSettings rend_settings;
-
-	if (get<2>(requests).has_value()) {
-		rend_settings = json_input::GetRenderSettings(get<2>(requests).value().AsMap());
-	}
-
-	renderer::MapRenderer map_renderer(rend_settings);
-
-	domain::RouteSettings rout_set;
-	if (get<3>(requests).has_value()) {
-		rout_set = json_input::GetRouteSettings(get<3>(requests).value().AsMap());
-	}
-	graph::DirectedWeightedGraph<double> graph(BuildGraph(tc, rout_set));
-
-	TransportRouter router(graph);
-
-	RequestHandler handler(tc, map_renderer, rout_set, router);
-	
-	auto stat = handler.GetStatistics(get<1>(requests));
-
-	json_input::PrintInfo(cout, stat);
+    json.ReadInput(input);
+    json.FillCatalogue();
+    router.GenerateRouter();
+    request_handler.SerializeBase();
 }
 
-domain::Bus PrepareNewBus(const TransportCatalogue& tc, request::RawBus& raw_bus) {
-	domain::Bus bus{ raw_bus.name_, raw_bus.route_is_circular_ };
-	for (auto& stop_name : raw_bus.stops_) {
-		domain::Stop* stop = tc.FindStop(stop_name);
-		bus.stops_.push_back(stop);
-		bus.unique_stops_.insert(stop);
-	}
-	return bus;
+void DeserializeBaseAndCreate() {
+    transport_db::TransportCatalogue catalog;
+    map_renderer::MapRenderer renderer;
+    transport_router::TransportRouter router(catalog);
+    serialization::Serialization serialization(catalog, renderer, router);
+    json_reader::JsonReader json(catalog, renderer, router, serialization);
+
+    ofstream output("output.json");
+    ifstream input("process_requests.json");/**/
+
+    transport_db::RequestHandler request_handler(catalog, renderer, router, serialization);
+    json.ReadInput(input);
+    serialization.Deserialize();
+    json.PrintRequests(output, request_handler);
 }
 
-void InfillCatalog(TransportCatalogue& tc, request::BaseRequests& req)
-{
-	for (auto& new_stop : std::get<0>(req)) {
-		tc.AddStop(move(new_stop));
-	}
-	for (auto& dist : std::get<1>(req)) {
-		tc.SetDist(move(dist));
-	}
-	for (auto& raw_bus : std::get<2>(req)) {
-		tc.AddBus(move(PrepareNewBus(tc, raw_bus)));
-	}
-
+void PrintUsage(std::ostream& stream = std::cerr) {
+    stream << "Usage: transport_catalogue [make_base|process_requests]\n"sv;
 }
 
-graph::DirectedWeightedGraph<double> BuildGraph(TransportCatalogue& tc, const domain::RouteSettings& settings)
-{
-	StatForGraph& stat = tc.GetGraphStat();
-	graph::DirectedWeightedGraph<double> graph(stat.stops_count_);
-	for (auto& edge : stat.short_edges_) {
-		edge.weight /= settings.bus_velocity;
-		edge.weight += settings.wait_time;
-		graph.AddEdge(edge);
-	}
-	return graph;
+int main(int argc, char* argv[]) {
+    /*if (argc != 2) {
+        PrintUsage();
+        return 1;
+    }
+
+    const std::string_view mode(argv[1]);
+
+    if (mode == "make_base"sv) {*/
+        // make base here
+        CreateAndSerializeBase();
+    /*}
+    else if (mode == "process_requests"sv) {*/
+        // process requests here
+        DeserializeBaseAndCreate();
+    /*}
+    else {
+        PrintUsage();
+        return 1;
+    }*/
 }

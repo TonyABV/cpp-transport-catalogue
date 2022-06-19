@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+import "map_renderer.proto";
+import "transport_router.proto";
+
+package serialization;
+
+message Coordinates {
+	double geo_lat = 1;
+	double geo_lng = 2;
+}
+
+message DistBtwStops {
+	uint32 from = 1;
+	uint32 to = 2;
+    uint32 distance = 3;
+}
+
+message Stop {			
+	string name = 1;
+	Coordinates coordinates = 2;
+	repeated uint32 buses_index = 3;
+}
+
+message Bus {
+	string name = 1;
+	repeated uint32 stops_index = 2;
+	bool round_trip = 3;	
+	uint32 end_stop_index = 4;
+}
+
+message Catalogue {
+    repeated Bus buses_base = 1;
+    repeated Stop stops_base = 2;
+	repeated DistBtwStops dist_btw_stops = 3;
+}
+
+message TransportCatalogue {
+	Catalogue catalogue = 1;
+	MapRenderer map_renderer = 2;
+	TransportRouter transport_router = 3;
+}
